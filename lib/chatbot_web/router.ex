@@ -1,6 +1,8 @@
 defmodule ChatbotWeb.Router do
   use ChatbotWeb, :router
 
+  import ChatbotWeb.UserAuth
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -8,6 +10,7 @@ defmodule ChatbotWeb.Router do
     plug :put_root_layout, html: {ChatbotWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug :fetch_current_user
   end
 
   pipeline :api do
@@ -18,6 +21,32 @@ defmodule ChatbotWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+  end
+
+  # Authentication routes
+  scope "/", ChatbotWeb do
+    pipe_through [:browser, :redirect_if_user_is_authenticated]
+
+    live_session :redirect_if_user_is_authenticated,
+      on_mount: [{ChatbotWeb.UserAuth, :redirect_if_user_is_authenticated}] do
+      live "/register", RegistrationLive
+      live "/login", LoginLive
+    end
+
+    post "/login", UserSessionController, :create
+  end
+
+  # Authenticated routes
+  scope "/", ChatbotWeb do
+    pipe_through [:browser, :require_authenticated_user]
+
+    live_session :require_authenticated_user,
+      on_mount: [{ChatbotWeb.UserAuth, :ensure_authenticated}] do
+      live "/chat", ChatLive.Index
+      live "/chat/:id", ChatLive.Show
+    end
+
+    delete "/logout", UserSessionController, :delete
   end
 
   # Other scopes may use custom stacks.

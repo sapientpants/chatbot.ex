@@ -25,11 +25,30 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/chatbot"
 import topbar from "../vendor/topbar"
 
+// Custom hooks
+const Hooks = {
+  ...colocatedHooks,
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks},
+  hooks: Hooks,
+})
+
+// Handle download events
+window.addEventListener("phx:download", (event) => {
+  const {filename, content} = event.detail
+  const blob = new Blob([content], {type: "text/plain"})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 })
 
 // Show progress bar on live navigation and form submits

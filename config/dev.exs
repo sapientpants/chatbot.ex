@@ -86,3 +86,6 @@ config :phoenix_live_view,
 
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
+
+# LM Studio configuration
+config :chatbot, :lm_studio_url, System.get_env("LM_STUDIO_URL", "http://localhost:1234/v1")
