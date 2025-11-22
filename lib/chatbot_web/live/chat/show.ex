@@ -26,6 +26,7 @@ defmodule ChatbotWeb.ChatLive.Show do
         |> assign(:available_models, [])
         |> assign(:selected_model, conversation.model_name)
         |> assign(:models_loading, true)
+        |> assign(:show_delete_modal, false)
         |> assign(:form, to_form(%{"content" => ""}, as: :message))
 
       # Load available models asynchronously
@@ -170,7 +171,17 @@ defmodule ChatbotWeb.ChatLive.Show do
   end
 
   @impl true
-  def handle_event("delete_conversation", _, socket) do
+  def handle_event("show_delete_modal", _, socket) do
+    {:noreply, assign(socket, :show_delete_modal, true)}
+  end
+
+  @impl true
+  def handle_event("hide_delete_modal", _, socket) do
+    {:noreply, assign(socket, :show_delete_modal, false)}
+  end
+
+  @impl true
+  def handle_event("confirm_delete_conversation", _, socket) do
     case Chat.delete_conversation(socket.assigns.current_conversation) do
       {:ok, _} ->
         {:noreply,
@@ -179,7 +190,10 @@ defmodule ChatbotWeb.ChatLive.Show do
          |> push_navigate(to: ~p"/chat")}
 
       {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to delete conversation")}
+        {:noreply,
+         socket
+         |> put_flash(:error, "Failed to delete conversation")
+         |> assign(:show_delete_modal, false)}
     end
   end
 
@@ -338,7 +352,7 @@ defmodule ChatbotWeb.ChatLive.Show do
                   <a phx-click="export_json">Export as JSON</a>
                 </li>
                 <li>
-                  <a phx-click="delete_conversation" data-confirm="Are you sure?">
+                  <a phx-click="show_delete_modal">
                     Delete Conversation
                   </a>
                 </li>
@@ -395,6 +409,22 @@ defmodule ChatbotWeb.ChatLive.Show do
           </.form>
         </div>
       </div>
+
+      <!-- Delete Confirmation Modal -->
+      <%= if @show_delete_modal do %>
+        <div class="modal modal-open">
+          <div class="modal-box">
+            <h3 class="font-bold text-lg">Delete Conversation?</h3>
+            <p class="py-4">
+              Are you sure you want to delete "<%= @current_conversation.title %>"? This action cannot be undone.
+            </p>
+            <div class="modal-action">
+              <button class="btn btn-ghost" phx-click="hide_delete_modal">Cancel</button>
+              <button class="btn btn-error" phx-click="confirm_delete_conversation">Delete</button>
+            </div>
+          </div>
+        </div>
+      <% end %>
     </div>
     """
   end
