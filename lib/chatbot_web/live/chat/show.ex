@@ -409,14 +409,14 @@ defmodule ChatbotWeb.ChatLive.Show do
           </.form>
         </div>
       </div>
-
-      <!-- Delete Confirmation Modal -->
+      
+    <!-- Delete Confirmation Modal -->
       <%= if @show_delete_modal do %>
         <div class="modal modal-open">
           <div class="modal-box">
             <h3 class="font-bold text-lg">Delete Conversation?</h3>
             <p class="py-4">
-              Are you sure you want to delete "<%= @current_conversation.title %>"? This action cannot be undone.
+              Are you sure you want to delete "{@current_conversation.title}"? This action cannot be undone.
             </p>
             <div class="modal-action">
               <button class="btn btn-ghost" phx-click="hide_delete_modal">Cancel</button>
