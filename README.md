@@ -32,6 +32,24 @@ cd assets && npm install
 cd ..
 ```
 
+### 1.5. Setup Git Hooks (Optional but Recommended)
+
+Install the pre-commit hook to automatically run code quality checks before committing:
+
+```bash
+# Option 1: Configure Git to use .githooks directory
+git config core.hooksPath .githooks
+
+# Option 2: Copy the hook manually
+cp .githooks/pre-commit .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
+
+The pre-commit hook runs `mix precommit` which performs:
+- Compilation with warnings as errors
+- Code formatting check
+- All tests
+
 ### 2. Configure Database
 
 The default database configuration uses:
