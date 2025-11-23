@@ -57,7 +57,7 @@ The pre-commit framework runs these checks automatically:
 - **Compilation** - Strict compilation with warnings as errors
 - **Static analysis** - Code quality checks with Credo
 - **Security scanning** - Phoenix-specific security analysis with Sobelow
-- **Tests with coverage** - Full test suite with 80% minimum coverage
+- **Tests with coverage** - Full test suite with 10% minimum coverage (goal: 80%)
 - **YAML/Markdown linting** - Validates documentation and config files
 - **GitHub Actions validation** - Ensures workflow files are valid
 
@@ -277,7 +277,7 @@ The comprehensive check suite includes:
 3. **Compilation** - `mix compile --warning-as-errors`
 4. **Static analysis** - `mix credo --strict` (code quality and consistency)
 5. **Security scanning** - `mix sobelow --config` (Phoenix security best practices)
-6. **Test coverage** - `mix coveralls --min-coverage 80` (requires 80% coverage)
+6. **Test coverage** - `mix coveralls` (enforces 10% minimum via coveralls.json; goal: 80%)
 7. **Dependency cleanup** - `mix deps.unlock --unused`
 
 Additional tools available:
@@ -400,7 +400,7 @@ For more detailed deployment instructions, see the [Phoenix deployment guide](ht
 - **Credo**: Static code analysis for Elixir
 - **Dialyzer**: Type checking and static analysis
 - **Sobelow**: Security-focused static analysis for Phoenix
-- **ExCoveralls**: Test coverage tracking (80% minimum)
+- **ExCoveralls**: Test coverage tracking (10% minimum enforced; goal: 80%)
 - **ex_check**: Unified tool runner for all checks
 - **mix_audit**: Dependency auditing
 

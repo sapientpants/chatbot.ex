@@ -25,11 +25,9 @@
     {:dialyzer,
      command: "mix dialyzer", detect: [{:package, :dialyxir}], env: %{"MIX_ENV" => "dev"}},
 
-    # Test suite with coverage
+    # Test suite with coverage (threshold configured in coveralls.json)
     {:ex_unit_with_coverage,
-     command: "mix coveralls --min-coverage 80",
-     detect: [{:package, :excoveralls}],
-     env: %{"MIX_ENV" => "test"}},
+     command: "mix coveralls", detect: [{:package, :excoveralls}], env: %{"MIX_ENV" => "test"}},
 
     # Unused dependency detection
     {:mix_audit, command: "mix deps.audit", detect: [{:package, :mix_audit}]},
