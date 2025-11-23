@@ -53,9 +53,8 @@ defmodule Chatbot.ChatTest do
   describe "get_conversation_with_messages!/1" do
     test "returns conversation with messages preloaded in order" do
       conversation = conversation_fixture()
+      # UUID7s are time-ordered, so sequential creation maintains order
       message1 = message_fixture(conversation: conversation, content: "First")
-      # Ensure different timestamps
-      Process.sleep(10)
       message2 = message_fixture(conversation: conversation, content: "Second")
 
       fetched = Chat.get_conversation_with_messages!(conversation.id)
