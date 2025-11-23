@@ -62,10 +62,16 @@ defmodule Chatbot.Accounts.User do
     changeset
     |> validate_required([:password])
     |> validate_length(:password, min: 12, max: 72)
-    # Examples of additional password validation:
-    # |> validate_format(:password, ~r/[a-z]/, message: "at least one lower case character")
-    # |> validate_format(:password, ~r/[A-Z]/, message: "at least one upper case character")
-    # |> validate_format(:password, ~r/[!?@#$%^&*_0-9]/, message: "at least one digit or punctuation character")
+    |> validate_format(:password, ~r/[a-z]/,
+      message: "must contain at least one lowercase letter"
+    )
+    |> validate_format(:password, ~r/[A-Z]/,
+      message: "must contain at least one uppercase letter"
+    )
+    |> validate_format(:password, ~r/[0-9]/, message: "must contain at least one number")
+    |> validate_format(:password, ~r/[!?@#$%^&*_]/,
+      message: "must contain at least one special character"
+    )
     |> maybe_hash_password(opts)
   end
 

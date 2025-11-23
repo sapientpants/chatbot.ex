@@ -1,4 +1,9 @@
 defmodule ChatbotWeb.Router do
+  @moduledoc """
+  Application router defining all HTTP routes and pipelines.
+
+  Configures authentication routes, chat interface, and development tools.
+  """
   use ChatbotWeb, :router
 
   import ChatbotWeb.UserAuth

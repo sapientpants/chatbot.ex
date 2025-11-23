@@ -1,4 +1,10 @@
 defmodule ChatbotWeb.ChatLive.Index do
+  @moduledoc """
+  Main chat interface LiveView.
+
+  Displays a list of conversations and allows creation of new conversations
+  with streaming AI responses from LM Studio.
+  """
   use ChatbotWeb, :live_view
 
   alias Chatbot.Chat
@@ -62,6 +68,7 @@ defmodule ChatbotWeb.ChatLive.Index do
   def handle_info({:done, _}, socket) do
     # Save the complete assistant message
     conversation_id = socket.assigns.current_conversation.id
+    user_id = socket.assigns.current_user.id
     assistant_message = socket.assigns.streaming_message
 
     {:ok, _message} =
@@ -72,7 +79,7 @@ defmodule ChatbotWeb.ChatLive.Index do
       })
 
     # Reload messages
-    conversation = Chat.get_conversation_with_messages!(conversation_id)
+    conversation = Chat.get_conversation_with_messages!(conversation_id, user_id)
 
     {:noreply,
      socket
@@ -123,7 +130,7 @@ defmodule ChatbotWeb.ChatLive.Index do
         end
 
       # Reload conversation with messages
-      conversation = Chat.get_conversation_with_messages!(conversation_id)
+      conversation = Chat.get_conversation_with_messages!(conversation_id, user_id)
       messages = conversation.messages
 
       # Build OpenAI format messages
@@ -135,7 +142,7 @@ defmodule ChatbotWeb.ChatLive.Index do
       # Capture LiveView PID before starting Task
       liveview_pid = self()
 
-      Task.start(fn ->
+      Task.Supervisor.start_child(Chatbot.TaskSupervisor, fn ->
         LMStudio.stream_chat_completion(openai_messages, model, liveview_pid)
       end)
 

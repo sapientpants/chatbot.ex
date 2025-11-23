@@ -1,4 +1,9 @@
 defmodule ChatbotWeb.Endpoint do
+  @moduledoc """
+  Phoenix HTTP endpoint for the Chatbot application.
+
+  Configures session management, static file serving, routing, and live reload.
+  """
   use Phoenix.Endpoint, otp_app: :chatbot
 
   # The session will be stored in the cookie and signed,

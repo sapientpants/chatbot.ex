@@ -1,4 +1,9 @@
 defmodule ChatbotWeb.Telemetry do
+  @moduledoc """
+  Telemetry supervisor for collecting application metrics.
+
+  Tracks Phoenix endpoint, database, and VM metrics for monitoring and observability.
+  """
   use Supervisor
   import Telemetry.Metrics
 

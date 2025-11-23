@@ -35,37 +35,63 @@ defmodule Chatbot.ChatTest do
     end
   end
 
-  describe "get_conversation!/1" do
-    test "returns the conversation with given id" do
-      conversation = conversation_fixture()
-      fetched = Chat.get_conversation!(conversation.id)
+  describe "get_conversation!/2" do
+    test "returns the conversation with given id for the user" do
+      user = user_fixture()
+      conversation = conversation_fixture(%{user: user})
+      fetched = Chat.get_conversation!(conversation.id, user.id)
       assert fetched.id == conversation.id
       assert fetched.title == conversation.title
     end
 
     test "raises when conversation does not exist" do
+      user = user_fixture()
+
       assert_raise Ecto.NoResultsError, fn ->
-        Chat.get_conversation!("00000000-0000-0000-0000-000000000000")
+        Chat.get_conversation!("00000000-0000-0000-0000-000000000000", user.id)
+      end
+    end
+
+    test "raises when conversation belongs to different user" do
+      user1 = user_fixture()
+      user2 = user_fixture()
+      conversation = conversation_fixture(%{user: user1})
+
+      assert_raise Ecto.NoResultsError, fn ->
+        Chat.get_conversation!(conversation.id, user2.id)
       end
     end
   end
 
-  describe "get_conversation_with_messages!/1" do
-    test "returns conversation with messages preloaded in order" do
-      conversation = conversation_fixture()
+  describe "get_conversation_with_messages!/2" do
+    test "returns conversation with messages preloaded in order for the user" do
+      user = user_fixture()
+      conversation = conversation_fixture(user: user)
       # UUID7s are time-ordered, so sequential creation maintains order
       message1 = message_fixture(conversation: conversation, content: "First")
       message2 = message_fixture(conversation: conversation, content: "Second")
 
-      fetched = Chat.get_conversation_with_messages!(conversation.id)
+      fetched = Chat.get_conversation_with_messages!(conversation.id, user.id)
       assert fetched.id == conversation.id
       assert length(fetched.messages) == 2
       assert [message1.id, message2.id] == Enum.map(fetched.messages, & &1.id)
     end
 
     test "raises when conversation does not exist" do
+      user = user_fixture()
+
       assert_raise Ecto.NoResultsError, fn ->
-        Chat.get_conversation_with_messages!("00000000-0000-0000-0000-000000000000")
+        Chat.get_conversation_with_messages!("00000000-0000-0000-0000-000000000000", user.id)
+      end
+    end
+
+    test "raises when conversation belongs to different user" do
+      user1 = user_fixture()
+      user2 = user_fixture()
+      conversation = conversation_fixture(user: user1)
+
+      assert_raise Ecto.NoResultsError, fn ->
+        Chat.get_conversation_with_messages!(conversation.id, user2.id)
       end
     end
   end
@@ -110,11 +136,19 @@ defmodule Chatbot.ChatTest do
     end
   end
 
-  describe "delete_conversation/1" do
-    test "deletes the conversation" do
-      conversation = conversation_fixture()
-      assert {:ok, %Conversation{}} = Chat.delete_conversation(conversation)
-      assert_raise Ecto.NoResultsError, fn -> Chat.get_conversation!(conversation.id) end
+  describe "delete_conversation/2" do
+    test "deletes the conversation when user owns it" do
+      user = user_fixture()
+      conversation = conversation_fixture(user: user)
+      assert {:ok, %Conversation{}} = Chat.delete_conversation(conversation, user.id)
+      assert_raise Ecto.NoResultsError, fn -> Chat.get_conversation!(conversation.id, user.id) end
+    end
+
+    test "returns error when user does not own conversation" do
+      user1 = user_fixture()
+      user2 = user_fixture()
+      conversation = conversation_fixture(user: user1)
+      assert {:error, :unauthorized} = Chat.delete_conversation(conversation, user2.id)
     end
   end
 

@@ -26,33 +26,39 @@ defmodule Chatbot.Chat do
   end
 
   @doc """
-  Gets a single conversation.
+  Gets a single conversation for a specific user.
 
-  Raises `Ecto.NoResultsError` if the Conversation does not exist.
+  Raises `Ecto.NoResultsError` if the Conversation does not exist or doesn't belong to the user.
 
   ## Examples
 
-      iex> get_conversation!(123)
+      iex> get_conversation!(123, user_id)
       %Conversation{}
 
-      iex> get_conversation!(456)
+      iex> get_conversation!(456, user_id)
       ** (Ecto.NoResultsError)
 
   """
-  def get_conversation!(id), do: Repo.get!(Conversation, id)
+  def get_conversation!(id, user_id) do
+    Conversation
+    |> where([c], c.id == ^id and c.user_id == ^user_id)
+    |> Repo.one!()
+  end
 
   @doc """
-  Gets a conversation with messages preloaded.
+  Gets a conversation with messages preloaded for a specific user.
+
+  Raises `Ecto.NoResultsError` if the Conversation does not exist or doesn't belong to the user.
 
   ## Examples
 
-      iex> get_conversation_with_messages!(123)
+      iex> get_conversation_with_messages!(123, user_id)
       %Conversation{messages: [%Message{}, ...]}
 
   """
-  def get_conversation_with_messages!(id) do
+  def get_conversation_with_messages!(id, user_id) do
     Conversation
-    |> where([c], c.id == ^id)
+    |> where([c], c.id == ^id and c.user_id == ^user_id)
     |> preload([c], messages: ^from(m in Message, order_by: m.inserted_at))
     |> Repo.one!()
   end
@@ -94,19 +100,23 @@ defmodule Chatbot.Chat do
   end
 
   @doc """
-  Deletes a conversation.
+  Deletes a conversation if it belongs to the specified user.
 
   ## Examples
 
-      iex> delete_conversation(conversation)
+      iex> delete_conversation(conversation, user_id)
       {:ok, %Conversation{}}
 
-      iex> delete_conversation(conversation)
-      {:error, %Ecto.Changeset{}}
+      iex> delete_conversation(conversation, different_user_id)
+      {:error, :unauthorized}
 
   """
-  def delete_conversation(%Conversation{} = conversation) do
-    Repo.delete(conversation)
+  def delete_conversation(%Conversation{} = conversation, user_id) do
+    if conversation.user_id == user_id do
+      Repo.delete(conversation)
+    else
+      {:error, :unauthorized}
+    end
   end
 
   @doc """
@@ -120,6 +130,27 @@ defmodule Chatbot.Chat do
   """
   def change_conversation(%Conversation{} = conversation, attrs \\ %{}) do
     Conversation.changeset(conversation, attrs)
+  end
+
+  @doc """
+  Verifies that a conversation belongs to a specific user.
+
+  Returns `{:ok, conversation}` if authorized, `{:error, :unauthorized}` otherwise.
+
+  ## Examples
+
+      iex> verify_conversation_access(conversation_id, user_id)
+      {:ok, %Conversation{}}
+
+      iex> verify_conversation_access(conversation_id, wrong_user_id)
+      {:error, :unauthorized}
+
+  """
+  def verify_conversation_access(conversation_id, user_id) do
+    case Repo.get_by(Conversation, id: conversation_id, user_id: user_id) do
+      nil -> {:error, :unauthorized}
+      conversation -> {:ok, conversation}
+    end
   end
 
   @doc """

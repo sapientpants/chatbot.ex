@@ -6,7 +6,7 @@ defmodule Chatbot.Accounts do
   import Ecto.Query, warn: false
   alias Chatbot.Repo
 
-  alias Chatbot.Accounts.User
+  alias Chatbot.Accounts.{User, UserToken}
 
   ## User registration
 
@@ -82,26 +82,61 @@ defmodule Chatbot.Accounts do
   ## Session
 
   @doc """
-  Generates a session token (returns user ID as token for simplicity).
-  In production, you might want to use a separate tokens table.
+  Generates a cryptographically secure session token.
+
+  Returns the token value to be sent to the client.
+
+  ## Examples
+
+      iex> generate_user_session_token(user)
+      "token_string"
   """
   def generate_user_session_token(user) do
-    user.id
+    {token, user_token} = UserToken.build_session_token(user)
+    Repo.insert!(user_token)
+    token
   end
 
   @doc """
-  Gets the user by session token (which is the user ID).
+  Gets the user by the signed token.
+
+  ## Examples
+
+      iex> get_user_by_session_token(valid_token)
+      %User{}
+
+      iex> get_user_by_session_token(invalid_token)
+      nil
   """
   def get_user_by_session_token(token) when is_binary(token) do
-    Repo.get(User, token)
+    {:ok, query} = UserToken.verify_session_token_query(token)
+    Repo.one(query)
   end
 
   def get_user_by_session_token(_), do: nil
 
   @doc """
-  Deletes the session token (no-op for now since we're using user ID).
+  Deletes the session token.
+
+  ## Examples
+
+      iex> delete_user_session_token(token)
+      :ok
   """
-  def delete_user_session_token(_token) do
+  def delete_user_session_token(token) do
+    Repo.delete_all(UserToken.by_token_and_context_query(token, "session"))
     :ok
+  end
+
+  @doc """
+  Deletes all session tokens for the given user.
+
+  ## Examples
+
+      iex> delete_user_session_tokens(user)
+      {count, nil}
+  """
+  def delete_user_session_tokens(user) do
+    Repo.delete_all(UserToken.by_user_and_contexts_query(user, ["session"]))
   end
 end

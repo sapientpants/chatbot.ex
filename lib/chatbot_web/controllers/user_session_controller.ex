@@ -1,8 +1,15 @@
 defmodule ChatbotWeb.UserSessionController do
+  @moduledoc """
+  Handles user session creation and deletion (login/logout).
+
+  Rate-limited to prevent brute force attacks.
+  """
   use ChatbotWeb, :controller
 
   alias Chatbot.Accounts
   alias ChatbotWeb.UserAuth
+
+  plug ChatbotWeb.Plugs.RateLimiter, :rate_limit_login when action == :create
 
   def create(conn, %{"user" => user_params}) do
     %{"email" => email, "password" => password} = user_params

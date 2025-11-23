@@ -25,14 +25,16 @@ defmodule Chatbot.Accounts.UserTest do
       changeset =
         User.registration_changeset(%User{}, %{email: unique_user_email(), password: "short"})
 
-      assert %{password: ["should be at least 12 character(s)"]} = errors_on(changeset)
+      errors = errors_on(changeset)
+      assert "should be at least 12 character(s)" in errors.password
 
       too_long = String.duplicate("a", 80)
 
       changeset =
         User.registration_changeset(%User{}, %{email: unique_user_email(), password: too_long})
 
-      assert %{password: ["should be at most 72 character(s)"]} = errors_on(changeset)
+      errors = errors_on(changeset)
+      assert "should be at most 72 character(s)" in errors.password
     end
 
     test "validates email uniqueness" do
@@ -142,7 +144,8 @@ defmodule Chatbot.Accounts.UserTest do
   describe "password_changeset/3" do
     test "validates password" do
       changeset = User.password_changeset(%User{}, %{password: "short"})
-      assert %{password: ["should be at least 12 character(s)"]} = errors_on(changeset)
+      errors = errors_on(changeset)
+      assert "should be at least 12 character(s)" in errors.password
     end
 
     test "validates password confirmation" do
