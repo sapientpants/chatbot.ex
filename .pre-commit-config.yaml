@@ -29,6 +29,7 @@ repos:
         exclude: ^\.github/workflows/  # GitHub Actions YAML can have template syntax
       - id: check-json
         name: Validate JSON files
+        exclude: tsconfig\.json$  # TypeScript config allows comments
       - id: check-toml
         name: Validate TOML files
       - id: check-xml
