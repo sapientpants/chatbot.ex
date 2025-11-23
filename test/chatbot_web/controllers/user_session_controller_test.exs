@@ -28,7 +28,11 @@ defmodule ChatbotWeb.UserSessionControllerTest do
           }
         })
 
-      assert conn.resp_cookies["_chatbot_web_user_remember_me"]
+      cookie = conn.resp_cookies["_chatbot_web_user_remember_me"]
+      assert cookie
+      # 60 days
+      assert cookie.max_age == 60 * 60 * 24 * 60
+      assert cookie.same_site == "Lax"
       assert redirected_to(conn) == ~p"/chat"
     end
 
@@ -60,6 +64,27 @@ defmodule ChatbotWeb.UserSessionControllerTest do
       assert redirected_to(conn) == ~p"/"
       refute get_session(conn, :user_token)
       assert Phoenix.Flash.get(conn.assigns.flash, :info) == "Logged out successfully."
+    end
+
+    test "logs the user out and deletes remember me cookie", %{conn: conn, user: user} do
+      # First login with remember me
+      conn =
+        post(conn, ~p"/login", %{
+          "user" => %{
+            "email" => user.email,
+            "password" => valid_user_password(),
+            "remember_me" => "true"
+          }
+        })
+
+      # Verify cookie was set
+      assert conn.resp_cookies["_chatbot_web_user_remember_me"]
+
+      # Then logout
+      conn = delete(conn, ~p"/logout")
+
+      # Verify cookie is deleted (max_age: 0 marks it for deletion)
+      assert conn.resp_cookies["_chatbot_web_user_remember_me"].max_age == 0
     end
   end
 end

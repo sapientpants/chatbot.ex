@@ -177,6 +177,20 @@ defmodule Chatbot.ChatTest do
 
       assert {:error, %Ecto.Changeset{}} = Chat.create_message(invalid_attrs)
     end
+
+    test "generates UUID for new message" do
+      conversation = conversation_fixture()
+
+      valid_attrs = %{
+        conversation_id: conversation.id,
+        role: "user",
+        content: "Test message"
+      }
+
+      assert {:ok, %Message{} = message} = Chat.create_message(valid_attrs)
+      assert message.id
+      assert is_binary(message.id)
+    end
   end
 
   describe "generate_conversation_title/1" do
