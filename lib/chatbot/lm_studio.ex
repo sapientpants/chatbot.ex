@@ -73,21 +73,17 @@ defmodule Chatbot.LMStudio do
           response
       end
 
-      case Finch.stream(
-             finch_request,
-             finch_name,
-             Req.Response.new(),
-             stream_handler,
-             finch_options
-           ) do
-        {:ok, response} ->
-          send(pid, {:done, ""})
-          {request, response}
+      {:ok, response} =
+        Finch.stream(
+          finch_request,
+          finch_name,
+          Req.Response.new(),
+          stream_handler,
+          finch_options
+        )
 
-        {:error, exception} ->
-          send(pid, {:error, Exception.message(exception)})
-          {request, exception}
-      end
+      send(pid, {:done, ""})
+      {request, response}
     end
 
     try do

@@ -1,0 +1,32 @@
+# Sobelow security-focused static analysis configuration
+# See: https://github.com/nccgroup/sobelow
+
+[
+  # Enable verbose output for detailed security findings
+  verbose: true,
+
+  # Private security vulnerabilities only (set to false to include all)
+  private: false,
+
+  # Skip these checks (if any are not applicable)
+  skip: [],
+
+  # Exit with non-zero status on findings (should match threshold)
+  exit: "low",
+
+  # Set threshold for findings (low, medium, high)
+  threshold: "low",
+
+  # Output format (can be: txt, json, compact, sarif)
+  format: "txt",
+
+  # Directories to check
+  router: "lib/chatbot_web/router.ex",
+
+  # Ignore files or directories
+  ignore: [],
+
+  # Ignore specific finding types (uncomment to disable)
+  # Example: ignore_files: ["lib/chatbot_web/controllers/page_controller.ex"]
+  ignore_files: []
+]

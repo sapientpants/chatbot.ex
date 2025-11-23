@@ -45,6 +45,22 @@ jobs:
         elixir-version: ${{ matrix.elixir }}
         otp-version: ${{ matrix.otp }}
 
+    - name: Set up Python for pre-commit
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install pre-commit
+      run: pip install pre-commit
+
+    - name: Restore pre-commit cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pre-commit
+        key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+        restore-keys: |
+          pre-commit-
+
     - name: Restore dependencies cache
       uses: actions/cache/restore@v4
       with:
@@ -55,14 +71,25 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-mix-${{ matrix.otp }}-${{ matrix.elixir }}-
 
+    - name: Restore Dialyzer PLT cache
+      uses: actions/cache@v4
+      with:
+        path: priv/plts
+        key: ${{ runner.os }}-plt-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-plt-${{ matrix.otp }}-${{ matrix.elixir }}-
+
     - name: Install dependencies
       run: mix deps.get
 
     - name: Compile dependencies
       run: mix deps.compile
 
-    - name: Run precommit checks
-      run: mix precommit
+    - name: Run pre-commit hooks
+      run: pre-commit run --all-files
+
+    - name: Run Dialyzer
+      run: mix dialyzer --format github
 
     - name: Check for uncommitted changes
       run: |

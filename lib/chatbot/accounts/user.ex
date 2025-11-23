@@ -1,4 +1,8 @@
 defmodule Chatbot.Accounts.User do
+  @moduledoc """
+  User schema and changesets for authentication.
+  """
+
   use Ecto.Schema
   import Ecto.Changeset
 

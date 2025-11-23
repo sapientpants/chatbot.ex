@@ -1,0 +1,7 @@
+{
+  "coverage_options": {
+    "minimum_coverage": 10
+  },
+  "skip_files": [],
+  "_comment": "Current coverage is ~12%. Goal is to reach 80% over time. Threshold set to 10% to prevent regressions while allowing incremental improvement."
+}

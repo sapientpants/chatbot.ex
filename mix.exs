@@ -11,7 +11,21 @@ defmodule Chatbot.MixProject do
       aliases: aliases(),
       deps: deps(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
-      listeners: [Phoenix.CodeReloader]
+      listeners: [Phoenix.CodeReloader],
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test
+      ],
+      dialyzer: [
+        plt_file: {:no_warn, "priv/plts/dialyzer.plt"},
+        plt_add_apps: [:mix, :ex_unit],
+        flags: [:error_handling, :underspecs],
+        # Ignore warnings from test support files which often have false positives
+        ignore_warnings: ".dialyzer_ignore.exs"
+      ]
     ]
   end
 
@@ -68,7 +82,14 @@ defmodule Chatbot.MixProject do
       {:gettext, "~> 0.26"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
-      {:bandit, "~> 1.5"}
+      {:bandit, "~> 1.5"},
+      # Code quality and analysis tools
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:sobelow, "~> 0.14", only: [:dev, :test], runtime: false},
+      {:ex_check, "~> 0.16", only: [:dev, :test], runtime: false},
+      {:excoveralls, "~> 0.18", only: :test},
+      {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -91,7 +112,15 @@ defmodule Chatbot.MixProject do
         "esbuild chatbot --minify",
         "phx.digest"
       ],
-      precommit: ["compile --warning-as-errors", "deps.unlock --unused", "format", "test"]
+      precommit: [
+        "hex.audit",
+        "format --check-formatted",
+        "compile --warning-as-errors",
+        "credo --strict",
+        "sobelow --config",
+        "coveralls",
+        "deps.unlock --unused"
+      ]
     ]
   end
 end

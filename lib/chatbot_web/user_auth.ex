@@ -1,4 +1,8 @@
 defmodule ChatbotWeb.UserAuth do
+  @moduledoc """
+  User authentication plugs and helpers for managing user sessions.
+  """
+
   use ChatbotWeb, :verified_routes
 
   import Plug.Conn

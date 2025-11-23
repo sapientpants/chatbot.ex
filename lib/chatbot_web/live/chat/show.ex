@@ -257,8 +257,7 @@ defmodule ChatbotWeb.ChatLive.Show do
     """
 
     messages_md =
-      messages
-      |> Enum.map(fn msg ->
+      Enum.map_join(messages, "\n---\n\n", fn msg ->
         role_label = if msg.role == "user", do: "**You:**", else: "**Assistant:**"
 
         """
@@ -268,7 +267,6 @@ defmodule ChatbotWeb.ChatLive.Show do
 
         """
       end)
-      |> Enum.join("\n---\n\n")
 
     header <> messages_md
   end

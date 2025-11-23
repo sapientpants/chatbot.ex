@@ -1,6 +1,8 @@
 # AI Chatbot with Phoenix LiveView & LM Studio
 
-A modern, real-time AI chatbot application built with Phoenix LiveView that connects to LM Studio for local LLM inference. Features include streaming responses, conversation management, multiple model selection, and export capabilities.
+A modern, real-time AI chatbot application built with Phoenix LiveView that connects to LM Studio for local LLM
+inference. Features include streaming responses, conversation management, multiple model selection, and export
+capabilities.
 
 ## Features
 
@@ -32,27 +34,50 @@ cd assets && npm install
 cd ..
 ```
 
-### 1.5. Setup Git Hooks (Optional but Recommended)
+### 1.5. Setup Pre-commit Hooks (Recommended)
 
-Install the pre-commit hook to automatically run code quality checks before committing:
+Install [pre-commit](https://pre-commit.com/) to automatically run comprehensive code quality checks before committing:
 
 ```bash
-# Option 1: Configure Git to use .githooks directory
-git config core.hooksPath .githooks
+# Install pre-commit framework (if not already installed)
+# On macOS with Homebrew:
+brew install pre-commit
 
-# Option 2: Copy the hook manually
-cp .githooks/pre-commit .git/hooks/pre-commit
-chmod +x .git/hooks/pre-commit
+# On other systems:
+pip install pre-commit
+
+# Install the git hooks
+pre-commit install
 ```
 
-The pre-commit hook runs `mix precommit` which performs:
-- Compilation with warnings as errors
-- Code formatting check
-- All tests
+The pre-commit framework runs these checks automatically:
+
+- **Security audit** - Checks for vulnerable dependencies with `mix hex.audit`
+- **Code formatting** - Validates formatting with `mix format`
+- **Compilation** - Strict compilation with warnings as errors
+- **Static analysis** - Code quality checks with Credo
+- **Security scanning** - Phoenix-specific security analysis with Sobelow
+- **Tests with coverage** - Full test suite with 10% minimum coverage (goal: 80%)
+- **YAML/Markdown linting** - Validates documentation and config files
+- **GitHub Actions validation** - Ensures workflow files are valid
+
+You can also run all checks manually:
+
+```bash
+# Run all pre-commit hooks
+pre-commit run --all-files
+
+# Or use the mix alias
+mix precommit
+
+# Or use ex_check for a unified experience
+mix check
+```
 
 ### 2. Configure Database
 
 The default database configuration uses:
+
 - Host: `localhost`
 - Username: `postgres`
 - Password: `postgres`
@@ -67,6 +92,7 @@ mix ecto.setup
 ```
 
 This will:
+
 - Create the database
 - Run migrations
 - Run seeds (if any)
@@ -120,13 +146,13 @@ The application will be available at [`http://localhost:4000`](http://localhost:
 
 ### 1. Register an Account
 
-- Navigate to http://localhost:4000/register
+- Navigate to <http://localhost:4000/register>
 - Enter your email and password (minimum 12 characters)
 - Click "Create an account"
 
 ### 2. Log In
 
-- Navigate to http://localhost:4000/login
+- Navigate to <http://localhost:4000/login>
 - Enter your credentials
 - Click "Log in"
 
@@ -153,7 +179,7 @@ The application will be available at [`http://localhost:4000`](http://localhost:
 
 ## Project Structure
 
-```
+```text
 chatbot/
 ├── lib/
 │   ├── chatbot/
@@ -192,12 +218,14 @@ chatbot/
 The application uses UUIDv7 for all primary keys:
 
 ### Users Table
+
 - `id` (binary_id, UUIDv7)
 - `email` (string, unique)
 - `hashed_password` (string)
 - `inserted_at`, `updated_at` (timestamps)
 
 ### Conversations Table
+
 - `id` (binary_id, UUIDv7)
 - `user_id` (foreign key to users)
 - `title` (string)
@@ -205,6 +233,7 @@ The application uses UUIDv7 for all primary keys:
 - `inserted_at`, `updated_at` (timestamps)
 
 ### Messages Table
+
 - `id` (binary_id, UUIDv7)
 - `conversation_id` (foreign key to conversations)
 - `role` (string: "user", "assistant", "system")
@@ -231,13 +260,30 @@ mix format
 Run all quality checks before committing:
 
 ```bash
+# Recommended: Use pre-commit framework (runs all checks)
+pre-commit run --all-files
+
+# Or use the mix alias (Elixir checks only)
 mix precommit
+
+# Or use ex_check for unified output
+mix check
 ```
 
-This runs:
-- Compilation with warnings as errors
-- Format checking
-- Tests
+The comprehensive check suite includes:
+
+1. **Security audit** - `mix hex.audit` (checks for retired/vulnerable packages)
+2. **Code formatting** - `mix format --check-formatted`
+3. **Compilation** - `mix compile --warning-as-errors`
+4. **Static analysis** - `mix credo --strict` (code quality and consistency)
+5. **Security scanning** - `mix sobelow --config` (Phoenix security best practices)
+6. **Test coverage** - `mix coveralls` (enforces 10% minimum via coveralls.json; goal: 80%)
+7. **Dependency cleanup** - `mix deps.unlock --unused`
+
+Additional tools available:
+
+- **Type checking** - `mix dialyzer` (slower, runs in CI by default)
+- **Unused deps** - `mix deps.audit` (finds unused dependencies)
 
 ### Database Management
 
@@ -259,9 +305,10 @@ mix ecto.reset
 
 ### LM Studio Connection Issues
 
-**Error: "Could not connect to LM Studio. Is it running?"**
+#### Error: "Could not connect to LM Studio. Is it running?"
 
 Solutions:
+
 1. Ensure LM Studio is running
 2. Verify the local server is started in LM Studio
 3. Check that a model is loaded
@@ -270,9 +317,10 @@ Solutions:
 
 ### Database Connection Issues
 
-**Error: "Connection refused" or "Database does not exist"**
+#### Error: "Connection refused" or "Database does not exist"
 
 Solutions:
+
 1. Ensure PostgreSQL is running
 2. Verify credentials in `config/dev.exs`
 3. Run `mix ecto.create` to create the database
@@ -280,9 +328,10 @@ Solutions:
 
 ### Asset Compilation Issues
 
-**Error: "esbuild not found" or "tailwind not found"**
+#### Error: "esbuild not found" or "tailwind not found"
 
 Solutions:
+
 ```bash
 mix assets.setup
 ```
@@ -304,6 +353,7 @@ The application uses daisyUI themes configured in `assets/css/app.css`. You can 
 For production deployment:
 
 1. Set environment variables:
+
    ```bash
    export SECRET_KEY_BASE="your-secret-key"
    export DATABASE_URL="your-database-url"
@@ -311,16 +361,19 @@ For production deployment:
    ```
 
 2. Build assets:
+
    ```bash
    mix assets.deploy
    ```
 
 3. Run migrations:
+
    ```bash
    mix ecto.migrate
    ```
 
 4. Start the server:
+
    ```bash
    mix phx.server
    ```
@@ -328,6 +381,8 @@ For production deployment:
 For more detailed deployment instructions, see the [Phoenix deployment guide](https://hexdocs.pm/phoenix/deployment.html).
 
 ## Technology Stack
+
+### Core Application
 
 - **Backend**: Phoenix Framework 1.8, Elixir 1.15
 - **Database**: PostgreSQL with Ecto
@@ -339,6 +394,16 @@ For more detailed deployment instructions, see the [Phoenix deployment guide](ht
 - **Markdown**: Earmark
 - **Syntax Highlighting**: Makeup
 
+### Code Quality & Development Tools
+
+- **Pre-commit Framework**: Automated git hooks for quality checks
+- **Credo**: Static code analysis for Elixir
+- **Dialyzer**: Type checking and static analysis
+- **Sobelow**: Security-focused static analysis for Phoenix
+- **ExCoveralls**: Test coverage tracking (10% minimum enforced; goal: 80%)
+- **ex_check**: Unified tool runner for all checks
+- **mix_audit**: Dependency auditing
+
 ## License
 
 This project is available under the MIT License.
@@ -346,15 +411,17 @@ This project is available under the MIT License.
 ## Learn More
 
 ### Phoenix Framework
-- Official website: https://www.phoenixframework.org/
-- Guides: https://hexdocs.pm/phoenix/overview.html
-- Docs: https://hexdocs.pm/phoenix
-- Forum: https://elixirforum.com/c/phoenix-forum
-- Source: https://github.com/phoenixframework/phoenix
+
+- Official website: <https://www.phoenixframework.org/>
+- Guides: <https://hexdocs.pm/phoenix/overview.html>
+- Docs: <https://hexdocs.pm/phoenix>
+- Forum: <https://elixirforum.com/c/phoenix-forum>
+- Source: <https://github.com/phoenixframework/phoenix>
 
 ### LM Studio
-- Website: https://lmstudio.ai/
-- Documentation: https://lmstudio.ai/docs
+
+- Website: <https://lmstudio.ai/>
+- Documentation: <https://lmstudio.ai/docs>
 
 ## Contributing
 

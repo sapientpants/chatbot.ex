@@ -1,0 +1,64 @@
+# Markdownlint configuration
+# See: https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+
+# Default state for all rules
+default: true
+
+# MD003/heading-style - Heading style
+heading-style:
+  style: "atx"
+
+# MD004/ul-style - Unordered list style
+ul-style:
+  style: "dash"
+
+# MD007/ul-indent - Unordered list indentation
+ul-indent:
+  indent: 2
+
+# MD013/line-length - Line length
+line-length:
+  line_length: 120
+  heading_line_length: 120
+  code_block_line_length: 120
+  code_blocks: false
+  tables: false
+  headings: true
+  strict: false
+  stern: false
+
+# MD024/no-duplicate-heading - Multiple headings with the same content
+no-duplicate-heading:
+  siblings_only: true
+
+# MD025/single-title - Multiple top-level headings in the same document
+single-title:
+  front_matter_title: "^\\s*title\\s*[:=]"
+
+# MD033/no-inline-html - Inline HTML
+no-inline-html:
+  allowed_elements: ["br", "details", "summary", "kbd", "sub", "sup"]
+
+# MD035/hr-style - Horizontal rule style
+hr-style:
+  style: "---"
+
+# MD041/first-line-heading - First line in a file should be a top-level heading
+first-line-heading:
+  front_matter_title: "^\\s*title\\s*[:=]"
+
+# MD046/code-block-style - Code block style
+code-block-style:
+  style: "fenced"
+
+# MD048/code-fence-style - Code fence style
+code-fence-style:
+  style: "backtick"
+
+# MD049/emphasis-style - Emphasis style
+emphasis-style:
+  style: "asterisk"
+
+# MD050/strong-style - Strong style
+strong-style:
+  style: "asterisk"
