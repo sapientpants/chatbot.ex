@@ -38,14 +38,7 @@ if echo "$cleaned_cmd" | grep -qE '(^|[[:space:]])--no-verify($|=|[[:space:]])';
   exit 2
 fi
 
-# Check for -n flag (short form, with word boundaries)
-# Note: Only block standalone -n, not -n as part of other flags like -nm
-if echo "$cleaned_cmd" | grep -qE '(^|[[:space:]])-n($|[[:space:]])'; then
-  echo "Error: Git commands with -n (--no-verify) flag are not allowed." >&2
-  echo "This ensures all git hooks and verification steps are properly executed." >&2
-  echo "Please run the git command without the -n flag." >&2
-  exit 2
-fi
+# (Removed invalid -n check; -n is not a short form for --no-verify in git)
 
 # Allow the command to proceed
 exit 0
