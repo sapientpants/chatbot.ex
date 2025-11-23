@@ -10,6 +10,7 @@ jobs:
   verify:
     name: Run Pre-commit Checks
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     services:
       postgres:
@@ -62,3 +63,13 @@ jobs:
 
     - name: Run precommit checks
       run: mix precommit
+
+    - name: Check for uncommitted changes
+      run: |
+        if [[ -n $(git status --porcelain) ]]; then
+          echo "❌ Uncommitted changes detected after precommit:"
+          git diff
+          echo ""
+          echo "Please run 'mix precommit' locally and commit any changes."
+          exit 1
+        fi
