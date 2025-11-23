@@ -106,11 +106,26 @@ defmodule Chatbot.AccountsTest do
   end
 
   describe "generate_user_session_token/1" do
-    # NOTE: Current implementation uses user.id as the session token for simplicity.
-    # This is acceptable for development/MVP but NOT secure for production:
-    # - No expiration mechanism
-    # - Cannot be revoked independently of the user
-    # - Predictable (enumerable UUIDs)
+    # ⚠️ SECURITY WARNING: Current implementation is NOT production-ready ⚠️
+    #
+    # The session token uses user.id directly, which has significant security risks:
+    # - No expiration mechanism (sessions never expire)
+    # - Cannot be revoked independently (must delete user to revoke)
+    # - Predictable tokens (UUID7s are time-ordered, potentially enumerable)
+    # - No rotation capability (same token forever)
+    #
+    # This implementation is ONLY acceptable for:
+    # - Local development
+    # - MVP/prototype phase
+    # - Non-production environments
+    #
+    # MUST be replaced with proper token system before production deployment:
+    # - Separate tokens table with user_id foreign key
+    # - Token expiration (e.g., 30 days)
+    # - Token revocation capability
+    # - Secure random tokens (not based on user.id)
+    # - Token rotation on sensitive actions
+    #
     # TODO: Implement proper session tokens table with expiration before production
     test "returns user id as token" do
       user = user_fixture()

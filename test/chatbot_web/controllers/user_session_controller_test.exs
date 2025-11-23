@@ -3,6 +3,9 @@ defmodule ChatbotWeb.UserSessionControllerTest do
 
   import Chatbot.Fixtures
 
+  # Match the remember me cookie max_age from UserAuth (60 days)
+  @remember_me_max_age 60 * 60 * 24 * 60
+
   setup do
     %{user: user_fixture()}
   end
@@ -30,8 +33,7 @@ defmodule ChatbotWeb.UserSessionControllerTest do
 
       cookie = conn.resp_cookies["_chatbot_web_user_remember_me"]
       assert cookie
-      # 60 days
-      assert cookie.max_age == 60 * 60 * 24 * 60
+      assert cookie.max_age == @remember_me_max_age
       assert cookie.same_site == "Lax"
       assert redirected_to(conn) == ~p"/chat"
     end
