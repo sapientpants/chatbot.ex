@@ -9,7 +9,12 @@ defmodule ChatbotWeb.Router do
     plug :fetch_live_flash
     plug :put_root_layout, html: {ChatbotWeb.Layouts, :root}
     plug :protect_from_forgery
-    plug :put_secure_browser_headers
+
+    plug :put_secure_browser_headers, %{
+      "content-security-policy" =>
+        "default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ws: wss:"
+    }
+
     plug :fetch_current_user
   end
 

@@ -1,4 +1,8 @@
 defmodule Chatbot.Chat.Message do
+  @moduledoc """
+  Message schema for chat conversations.
+  """
+
   use Ecto.Schema
   import Ecto.Changeset
 
