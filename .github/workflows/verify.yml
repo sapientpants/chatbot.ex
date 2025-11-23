@@ -47,7 +47,7 @@ jobs:
         otp-version: ${{ matrix.otp }}
 
     - name: Restore dependencies cache
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: |
           deps
@@ -74,3 +74,12 @@ jobs:
           echo "Please run 'mix precommit' locally and commit any changes."
           exit 1
         fi
+
+    - name: Save dependencies cache
+      uses: actions/cache/save@v4
+      if: always()
+      with:
+        path: |
+          deps
+          _build
+        key: ${{ runner.os }}-mix-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
