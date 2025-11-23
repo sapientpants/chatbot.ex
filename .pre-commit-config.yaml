@@ -114,7 +114,7 @@ repos:
       # 6. Test suite with coverage (slow - runs last)
       - id: mix-test-coverage
         name: Mix test with 80% coverage
-        entry: bash -c 'MIX_ENV=test mix test --cover'
+        entry: bash -c 'MIX_ENV=test mix coveralls'
         language: system
         pass_filenames: false
         files: ^(lib/|test/).*\.ex[s]?$

@@ -11,8 +11,8 @@
   # Skip these checks (if any are not applicable)
   skip: [],
 
-  # Exit with non-zero status on findings
-  exit: "high",
+  # Exit with non-zero status on findings (should match threshold)
+  exit: "low",
 
   # Set threshold for findings (low, medium, high)
   threshold: "low",

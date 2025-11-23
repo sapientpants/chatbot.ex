@@ -85,9 +85,6 @@ jobs:
     - name: Compile dependencies
       run: mix deps.compile
 
-    - name: Run precommit checks
-      run: mix precommit
-
     - name: Run pre-commit hooks
       run: pre-commit run --all-files
 
