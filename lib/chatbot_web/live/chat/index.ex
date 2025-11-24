@@ -53,8 +53,10 @@ defmodule ChatbotWeb.ChatLive.Index do
       |> assign(:streaming_task_pid, nil)
       |> assign(:form, to_form(%{"content" => ""}, as: :message))
 
-    # Load available models asynchronously
-    send(self(), :load_models)
+    # Load available models asynchronously only on connected mount
+    if connected?(socket) do
+      send(self(), :load_models)
+    end
 
     {:ok, socket}
   end
@@ -103,7 +105,21 @@ defmodule ChatbotWeb.ChatLive.Index do
 
   @impl true
   def handle_event("new_conversation", _, socket) do
-    StreamingHelpers.handle_new_conversation(socket, ~p"/chat")
+    user_id = socket.assigns.current_user.id
+
+    {:ok, conversation} =
+      Chat.create_conversation(%{
+        user_id: user_id,
+        title: "New Conversation"
+      })
+
+    {:noreply,
+     socket
+     |> assign(:current_conversation, conversation)
+     |> assign(:messages, [])
+     |> assign(:streaming_chunks, [])
+     |> assign(:conversations, Chat.list_conversations(user_id))
+     |> assign(:selected_model, conversation.model_name)}
   end
 
   @impl true
