@@ -54,7 +54,11 @@ defmodule ChatbotWeb.RegistrationLive do
   end
 
   def handle_event("save", %{"user" => user_params}, socket) do
-    ip = get_connect_info(socket, :peer_data).address |> Tuple.to_list() |> Enum.join(".")
+    ip =
+      case get_connect_info(socket, :peer_data) do
+        %{address: address} -> address |> Tuple.to_list() |> Enum.join(".")
+        _ -> "unknown"
+      end
 
     case RateLimiter.check_registration_rate_limit(ip) do
       :ok ->

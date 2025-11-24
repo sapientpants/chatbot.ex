@@ -19,10 +19,7 @@ defmodule Chatbot.Accounts.UserToken do
   schema "user_tokens" do
     field :token, :binary
     field :context, :string
-    field :user_id, :binary_id
-
-    belongs_to :user, Chatbot.Accounts.User, define_field: false
-
+    belongs_to :user, Chatbot.Accounts.User
     field :inserted_at, :utc_datetime
   end
 
