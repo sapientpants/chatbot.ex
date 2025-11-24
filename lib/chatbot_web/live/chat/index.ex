@@ -177,8 +177,8 @@ defmodule ChatbotWeb.ChatLive.Index do
                 disabled={@is_streaming}
               >
                 <%= for model <- @available_models do %>
-                  <option value={model["id"]} selected={model["id"] == @selected_model}>
-                    {model["id"]}
+                  <option value={model} selected={model == @selected_model}>
+                    {model}
                   </option>
                 <% end %>
               </select>
