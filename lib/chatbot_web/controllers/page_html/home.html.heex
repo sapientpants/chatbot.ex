@@ -1,58 +1,15 @@
-<Layouts.flash_group flash={@flash} />
-<div class="min-h-screen flex items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
-  <div class="max-w-4xl w-full">
-    <div class="text-center">
-      <div class="flex justify-center mb-8">
-        <div class="relative">
-          <div class="absolute inset-0 bg-primary/20 blur-2xl rounded-full"></div>
-          <svg
-            class="h-20 w-20 text-primary relative"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="1.5"
-              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-            />
-          </svg>
-        </div>
-      </div>
+<div class="min-h-screen bg-base-200">
+  <Layouts.navbar current_user={assigns[:current_user]} />
+  <Layouts.flash_group flash={@flash} />
 
-      <h1 class="text-5xl font-bold tracking-tight mb-4">
-        Welcome to Chatbot
-      </h1>
-
-      <p class="text-xl text-base-content/70 mb-12 max-w-2xl mx-auto">
-        Your intelligent AI assistant powered by Phoenix LiveView and LM Studio.
-        Start conversations, get instant responses, and experience the future of interactive chat.
-      </p>
-
-      <div class="flex justify-center mb-16">
-        <%= if @current_user do %>
-          <.link
-            navigate="/chat"
-            class="btn btn-primary btn-lg px-8"
-          >
-            Get Started
-          </.link>
-        <% else %>
-          <.link
-            navigate="/register"
-            class="btn btn-primary btn-lg px-8"
-          >
-            Get Started
-          </.link>
-        <% end %>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">
-        <div class="card bg-base-200">
-          <div class="card-body items-center text-center">
+  <div class="flex items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
+    <div class="max-w-4xl w-full">
+      <div class="text-center">
+        <div class="flex justify-center mb-8">
+          <div class="relative">
+            <div class="absolute inset-0 bg-primary/20 blur-2xl rounded-full"></div>
             <svg
-              class="h-12 w-12 text-primary mb-4"
+              class="h-20 w-20 text-primary relative"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -61,64 +18,107 @@
                 stroke-linecap="round"
                 stroke-linejoin="round"
                 stroke-width="1.5"
-                d="M13 10V3L4 14h7v7l9-11h-7z"
+                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
               />
             </svg>
-            <h3 class="card-title text-lg">Real-time Responses</h3>
-            <p class="text-base-content/70">
-              Experience instant, streaming AI responses powered by LiveView
-            </p>
           </div>
         </div>
 
-        <div class="card bg-base-200">
-          <div class="card-body items-center text-center">
-            <svg
-              class="h-12 w-12 text-primary mb-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+        <h1 class="text-5xl font-bold tracking-tight mb-4">
+          Welcome to Chatbot
+        </h1>
+
+        <p class="text-xl text-base-content/70 mb-12 max-w-2xl mx-auto">
+          Your intelligent AI assistant powered by Phoenix LiveView and LM Studio.
+          Start conversations, get instant responses, and experience the future of interactive chat.
+        </p>
+
+        <div class="flex justify-center mb-16">
+          <%= if @current_user do %>
+            <.link
+              navigate="/chat"
+              class="btn btn-primary btn-lg px-8"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.5"
-                d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
-              />
-            </svg>
-            <h3 class="card-title text-lg">Conversation History</h3>
-            <p class="text-base-content/70">
-              Keep track of all your chats and continue where you left off
-            </p>
-          </div>
+              Get Started
+            </.link>
+          <% else %>
+            <.link
+              navigate="/register"
+              class="btn btn-primary btn-lg px-8"
+            >
+              Get Started
+            </.link>
+          <% end %>
         </div>
 
-        <div class="card bg-base-200">
-          <div class="card-body items-center text-center">
-            <svg
-              class="h-12 w-12 text-primary mb-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.5"
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-              />
-            </svg>
-            <h3 class="card-title text-lg">Secure & Private</h3>
-            <p class="text-base-content/70">
-              Your conversations are protected with secure authentication
-            </p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">
+          <div class="card bg-base-200">
+            <div class="card-body items-center text-center">
+              <svg
+                class="h-12 w-12 text-primary mb-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.5"
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                />
+              </svg>
+              <h3 class="card-title text-lg">Real-time Responses</h3>
+              <p class="text-base-content/70">
+                Experience instant, streaming AI responses powered by LiveView
+              </p>
+            </div>
+          </div>
+
+          <div class="card bg-base-200">
+            <div class="card-body items-center text-center">
+              <svg
+                class="h-12 w-12 text-primary mb-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.5"
+                  d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
+                />
+              </svg>
+              <h3 class="card-title text-lg">Conversation History</h3>
+              <p class="text-base-content/70">
+                Keep track of all your chats and continue where you left off
+              </p>
+            </div>
+          </div>
+
+          <div class="card bg-base-200">
+            <div class="card-body items-center text-center">
+              <svg
+                class="h-12 w-12 text-primary mb-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.5"
+                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                />
+              </svg>
+              <h3 class="card-title text-lg">Secure & Private</h3>
+              <p class="text-base-content/70">
+                Your conversations are protected with secure authentication
+              </p>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-
-    <div class="mt-16 flex justify-center">
-      <Layouts.theme_toggle />
     </div>
   </div>
 </div>

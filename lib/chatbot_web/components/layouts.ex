@@ -151,4 +151,57 @@ defmodule ChatbotWeb.Layouts do
     </div>
     """
   end
+
+  @doc """
+  Renders the global navigation header with authentication links.
+
+  Shows different content based on whether a user is logged in:
+  - When logged out: Shows "Log in" and "Sign up" links
+  - When logged in: Shows user email and "Logout" link
+
+  ## Examples
+
+      <.navbar current_user={@current_user} />
+  """
+  attr :current_user, :map, default: nil, doc: "the currently logged in user, if any"
+
+  def navbar(assigns) do
+    ~H"""
+    <header class="navbar bg-base-100 border-b border-base-300 px-4 sm:px-6 lg:px-8">
+      <div class="flex-1">
+        <.link navigate={~p"/"} class="flex items-center gap-2 text-xl font-bold">
+          Chatbot
+        </.link>
+      </div>
+      <div class="flex-none">
+        <ul class="menu menu-horizontal px-1 gap-2">
+          <li>
+            <.theme_toggle />
+          </li>
+          <%= if @current_user do %>
+            <li>
+              <span class="text-sm">{@current_user.email}</span>
+            </li>
+            <li>
+              <.link href={~p"/logout"} method="delete" class="btn btn-sm btn-ghost">
+                Logout
+              </.link>
+            </li>
+          <% else %>
+            <li>
+              <.link navigate={~p"/login"} class="btn btn-sm btn-ghost">
+                Log in
+              </.link>
+            </li>
+            <li>
+              <.link navigate={~p"/register"} class="btn btn-sm btn-primary">
+                Sign up
+              </.link>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    </header>
+    """
+  end
 end
