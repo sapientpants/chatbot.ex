@@ -43,8 +43,10 @@ defmodule ChatbotWeb.ChatLive.Show do
         |> assign(:streaming_task_pid, nil)
         |> assign(:form, to_form(%{"content" => ""}, as: :message))
 
-      # Load available models asynchronously
-      send(self(), :load_models)
+      # Load available models asynchronously only on connected mount
+      if connected?(socket) do
+        send(self(), :load_models)
+      end
 
       {:ok, socket}
     end
