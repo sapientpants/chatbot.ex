@@ -6,14 +6,16 @@ defmodule ChatbotWeb.Endpoint do
   """
   use Phoenix.Endpoint, otp_app: :chatbot
 
-  # The session will be stored in the cookie and signed,
-  # this means its contents can be read but not tampered with.
-  # Set :encryption_salt if you would also like to encrypt it.
+  # The session will be stored in the cookie, signed and encrypted.
+  # This prevents both tampering and reading of session contents.
   @session_options [
     store: :cookie,
     key: "_chatbot_key",
     signing_salt: "8ir2WoZd",
-    same_site: "Lax"
+    encryption_salt: "X9kP2mNq",
+    same_site: "Lax",
+    secure: Mix.env() == :prod,
+    http_only: true
   ]
 
   socket "/live", Phoenix.LiveView.Socket,

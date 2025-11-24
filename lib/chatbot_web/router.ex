@@ -15,7 +15,7 @@ defmodule ChatbotWeb.Router do
     plug :put_root_layout, html: {ChatbotWeb.Layouts, :root}
     plug :protect_from_forgery
 
-    # Content Security Policy configuration
+    # Content Security Policy and security headers configuration
     # Note: 'unsafe-inline' and 'unsafe-eval' are required for Phoenix LiveView to function properly:
     # - 'unsafe-inline' allows inline <script> tags that LiveView uses for client-server communication
     # - 'unsafe-eval' is needed for LiveView's JavaScript runtime
@@ -23,7 +23,11 @@ defmodule ChatbotWeb.Router do
     # For production, consider using nonces or hashes with LiveView 0.18+ for stricter CSP
     plug :put_secure_browser_headers, %{
       "content-security-policy" =>
-        "default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ws: wss:"
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:; font-src 'self' data:; object-src 'none'; frame-ancestors 'none'",
+      "x-frame-options" => "DENY",
+      "x-content-type-options" => "nosniff",
+      "referrer-policy" => "strict-origin-when-cross-origin",
+      "permissions-policy" => "geolocation=(), microphone=(), camera=()"
     }
 
     plug :fetch_current_user
