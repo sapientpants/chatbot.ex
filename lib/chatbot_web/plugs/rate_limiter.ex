@@ -55,7 +55,7 @@ defmodule ChatbotWeb.Plugs.RateLimiter do
 
   @doc """
   Rate limits message creation to 30 per minute per user.
-  Can be called from LiveView with socket.
+  Can be called from LiveView.
   """
   def check_message_rate_limit(user_id) do
     key = "messages:#{user_id}"
@@ -63,6 +63,19 @@ defmodule ChatbotWeb.Plugs.RateLimiter do
     case Hammer.check_rate(key, 60_000, 30) do
       {:allow, _count} -> :ok
       {:deny, _limit} -> {:error, "Rate limit exceeded. Please slow down."}
+    end
+  end
+
+  @doc """
+  Rate limits registration attempts to 3 per hour per IP.
+  Can be called from LiveView.
+  """
+  def check_registration_rate_limit(ip) do
+    key = "registration:#{ip}"
+
+    case Hammer.check_rate(key, 60_000 * 60, 3) do
+      {:allow, _count} -> :ok
+      {:deny, _limit} -> {:error, "Too many registration attempts. Please try again later."}
     end
   end
 

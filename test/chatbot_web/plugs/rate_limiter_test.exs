@@ -66,8 +66,17 @@ defmodule ChatbotWeb.Plugs.RateLimiterTest do
     end
 
     test "uses IP address for rate limiting", %{conn: conn} do
-      conn1 = %{conn | remote_ip: {10, 0, 0, 1}}
-      conn2 = %{conn | remote_ip: {10, 0, 0, 2}}
+      conn1 =
+        conn
+        |> Map.put(:remote_ip, {10, 0, 0, 1})
+        |> Phoenix.ConnTest.init_test_session(%{})
+        |> Phoenix.Controller.fetch_flash()
+
+      conn2 =
+        conn
+        |> Map.put(:remote_ip, {10, 0, 0, 2})
+        |> Phoenix.ConnTest.init_test_session(%{})
+        |> Phoenix.Controller.fetch_flash()
 
       # Max out rate limit for first IP
       Enum.each(1..5, fn _ ->
@@ -112,8 +121,17 @@ defmodule ChatbotWeb.Plugs.RateLimiterTest do
     end
 
     test "uses IP address for rate limiting", %{conn: conn} do
-      conn1 = %{conn | remote_ip: {172, 16, 0, 1}}
-      conn2 = %{conn | remote_ip: {172, 16, 0, 2}}
+      conn1 =
+        conn
+        |> Map.put(:remote_ip, {172, 16, 0, 1})
+        |> Phoenix.ConnTest.init_test_session(%{})
+        |> Phoenix.Controller.fetch_flash()
+
+      conn2 =
+        conn
+        |> Map.put(:remote_ip, {172, 16, 0, 2})
+        |> Phoenix.ConnTest.init_test_session(%{})
+        |> Phoenix.Controller.fetch_flash()
 
       # Max out rate limit for first IP
       Enum.each(1..3, fn _ ->
@@ -156,6 +174,39 @@ defmodule ChatbotWeb.Plugs.RateLimiterTest do
 
       # Second user should still be allowed
       assert RateLimiter.check_message_rate_limit(user_id2) == :ok
+    end
+  end
+
+  describe "check_registration_rate_limit/1" do
+    test "allows registration when under rate limit" do
+      ip = "192.168.1.100"
+      assert RateLimiter.check_registration_rate_limit(ip) == :ok
+    end
+
+    test "denies registration when over rate limit" do
+      ip = "192.168.1.101"
+
+      # Make 3 requests (the limit)
+      Enum.each(1..3, fn _ ->
+        RateLimiter.check_registration_rate_limit(ip)
+      end)
+
+      # 4th request should be denied
+      assert {:error, message} = RateLimiter.check_registration_rate_limit(ip)
+      assert message =~ "Too many registration attempts"
+    end
+
+    test "uses IP for rate limiting" do
+      ip1 = "192.168.1.102"
+      ip2 = "192.168.1.103"
+
+      # Max out rate limit for first IP
+      Enum.each(1..3, fn _ ->
+        RateLimiter.check_registration_rate_limit(ip1)
+      end)
+
+      # Second IP should still be allowed
+      assert RateLimiter.check_registration_rate_limit(ip2) == :ok
     end
   end
 end

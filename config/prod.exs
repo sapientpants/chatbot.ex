@@ -10,7 +10,7 @@ config :chatbot, ChatbotWeb.Endpoint,
   force_ssl: [
     rewrite_on: [:x_forwarded_proto],
     hsts: true,
-    expires: 31_536_000,
+    max_age: 31_536_000,
     preload: true,
     subdomains: true
   ]

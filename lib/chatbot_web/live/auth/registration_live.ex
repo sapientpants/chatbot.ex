@@ -8,6 +8,7 @@ defmodule ChatbotWeb.RegistrationLive do
 
   alias Chatbot.Accounts
   alias Chatbot.Accounts.User
+  alias ChatbotWeb.Plugs.RateLimiter
 
   def render(assigns) do
     ~H"""
@@ -54,10 +55,9 @@ defmodule ChatbotWeb.RegistrationLive do
 
   def handle_event("save", %{"user" => user_params}, socket) do
     ip = get_connect_info(socket, :peer_data).address |> Tuple.to_list() |> Enum.join(".")
-    key = "registration:#{ip}"
 
-    case Hammer.check_rate(key, 60_000 * 60, 3) do
-      {:allow, _count} ->
+    case RateLimiter.check_registration_rate_limit(ip) do
+      :ok ->
         case Accounts.register_user(user_params) do
           {:ok, _user} ->
             {:noreply,
@@ -69,10 +69,10 @@ defmodule ChatbotWeb.RegistrationLive do
             {:noreply, socket |> assign(check_errors: true) |> assign_form(changeset)}
         end
 
-      {:deny, _limit} ->
+      {:error, message} ->
         {:noreply,
          socket
-         |> put_flash(:error, "Too many registration attempts. Please try again later.")
+         |> put_flash(:error, message)
          |> push_navigate(to: ~p"/register")}
     end
   end

@@ -71,7 +71,8 @@ defmodule Chatbot.Accounts.UserToken do
     # Decode the Base64-encoded token before hashing
     case Base.url_decode64(token, padding: false) do
       {:ok, decoded} -> :crypto.hash(@hash_algorithm, decoded)
-      :error -> :crypto.hash(@hash_algorithm, token)
+      # Return a hash that will never match any valid token
+      :error -> <<0::256>>
     end
   end
 
