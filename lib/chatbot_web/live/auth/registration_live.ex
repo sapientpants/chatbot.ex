@@ -45,20 +45,24 @@ defmodule ChatbotWeb.RegistrationLive do
   def mount(_params, _session, socket) do
     changeset = Accounts.change_user_registration(%User{})
 
+    # Get IP address during mount when connect_info is available
+    ip =
+      case get_connect_info(socket, :peer_data) do
+        %{address: address} -> address |> Tuple.to_list() |> Enum.join(".")
+        _ -> "unknown"
+      end
+
     socket =
       socket
-      |> assign(trigger_submit: false, check_errors: false)
+      |> assign(trigger_submit: false, check_errors: false, client_ip: ip)
       |> assign_form(changeset)
 
     {:ok, socket, temporary_assigns: [form: nil]}
   end
 
   def handle_event("save", %{"user" => user_params}, socket) do
-    ip =
-      case get_connect_info(socket, :peer_data) do
-        %{address: address} -> address |> Tuple.to_list() |> Enum.join(".")
-        _ -> "unknown"
-      end
+    # Use IP address stored in assigns during mount
+    ip = socket.assigns.client_ip
 
     case RateLimiter.check_registration_rate_limit(ip) do
       :ok ->
