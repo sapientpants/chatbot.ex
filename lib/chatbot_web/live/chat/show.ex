@@ -8,7 +8,7 @@ defmodule ChatbotWeb.ChatLive.Show do
   use ChatbotWeb, :live_view
 
   alias Chatbot.Chat
-  alias Chatbot.LMStudio
+  alias ChatbotWeb.Live.Chat.StreamingHelpers
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -34,12 +34,13 @@ defmodule ChatbotWeb.ChatLive.Show do
         |> assign(:conversations, Chat.list_conversations(user_id))
         |> assign(:current_conversation, conversation)
         |> assign(:messages, conversation.messages)
-        |> assign(:streaming_message, "")
+        |> assign(:streaming_chunks, [])
         |> assign(:is_streaming, false)
         |> assign(:available_models, [])
         |> assign(:selected_model, conversation.model_name)
         |> assign(:models_loading, true)
         |> assign(:show_delete_modal, false)
+        |> assign(:streaming_task_pid, nil)
         |> assign(:form, to_form(%{"content" => ""}, as: :message))
 
       # Load available models asynchronously
@@ -51,138 +52,49 @@ defmodule ChatbotWeb.ChatLive.Show do
 
   @impl true
   def handle_info(:load_models, socket) do
-    case LMStudio.list_models() do
-      {:ok, models} ->
-        selected_model =
-          socket.assigns.selected_model || if(length(models) > 0, do: hd(models)["id"], else: nil)
-
-        {:noreply,
-         socket
-         |> assign(:available_models, models)
-         |> assign(:selected_model, selected_model)
-         |> assign(:models_loading, false)}
-
-      {:error, _} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, "Could not connect to LM Studio. Is it running?")
-         |> assign(:models_loading, false)}
-    end
+    socket = assign(socket, :models_loading, false)
+    StreamingHelpers.handle_load_models(socket)
   end
 
   @impl true
   def handle_info({:chunk, content}, socket) do
-    {:noreply, assign(socket, :streaming_message, socket.assigns.streaming_message <> content)}
+    StreamingHelpers.handle_chunk(content, socket)
   end
 
   @impl true
   def handle_info({:done, _}, socket) do
-    # Save the complete assistant message
     conversation_id = socket.assigns.current_conversation.id
     user_id = socket.assigns.current_user.id
-    assistant_message = socket.assigns.streaming_message
 
-    {:ok, _message} =
-      Chat.create_message(%{
-        conversation_id: conversation_id,
-        role: "assistant",
-        content: assistant_message
-      })
+    # Update conversations list
+    socket = assign(socket, :conversations, Chat.list_conversations(user_id))
 
-    # Reload messages
-    conversation = Chat.get_conversation_with_messages!(conversation_id, user_id)
-
-    {:noreply,
-     socket
-     |> assign(:messages, conversation.messages)
-     |> assign(:streaming_message, "")
-     |> assign(:is_streaming, false)
-     |> assign(:current_conversation, conversation)}
+    StreamingHelpers.handle_done(conversation_id, user_id, socket)
   end
 
   @impl true
   def handle_info({:error, error_msg}, socket) do
-    {:noreply,
-     socket
-     |> put_flash(:error, "Error: #{error_msg}")
-     |> assign(:is_streaming, false)
-     |> assign(:streaming_message, "")}
+    StreamingHelpers.handle_streaming_error(error_msg, socket)
+  end
+
+  @impl true
+  def handle_info({:DOWN, _ref, :process, _pid, reason}, socket) do
+    StreamingHelpers.handle_task_down(reason, socket)
   end
 
   @impl true
   def handle_event("send_message", %{"message" => %{"content" => content}}, socket) do
-    if String.trim(content) == "" do
-      {:noreply, socket}
-    else
-      conversation_id = socket.assigns.current_conversation.id
-      user_id = socket.assigns.current_user.id
-
-      # Save user message
-      {:ok, _message} =
-        Chat.create_message(%{
-          conversation_id: conversation_id,
-          role: "user",
-          content: content
-        })
-
-      # Reload conversation with messages
-      conversation = Chat.get_conversation_with_messages!(conversation_id, user_id)
-      messages = conversation.messages
-
-      # Build OpenAI format messages
-      openai_messages = Chat.build_openai_messages(messages)
-
-      # Start streaming response from LM Studio
-      model = socket.assigns.selected_model || "default"
-
-      # Update conversation model if changed
-      socket =
-        if socket.assigns.current_conversation.model_name != model do
-          {:ok, updated_conv} =
-            Chat.update_conversation(socket.assigns.current_conversation, %{model_name: model})
-
-          assign(socket, :current_conversation, updated_conv)
-        else
-          socket
-        end
-
-      # Capture LiveView PID before starting Task
-      liveview_pid = self()
-
-      Task.Supervisor.start_child(Chatbot.TaskSupervisor, fn ->
-        LMStudio.stream_chat_completion(openai_messages, model, liveview_pid)
-      end)
-
-      {:noreply,
-       socket
-       |> assign(:messages, messages)
-       |> assign(:streaming_message, "")
-       |> assign(:is_streaming, true)
-       |> assign(:form, to_form(%{"content" => ""}, as: :message))}
-    end
+    StreamingHelpers.send_message_with_streaming(content, socket)
   end
 
   @impl true
   def handle_event("select_model", %{"model" => model_id}, socket) do
-    {:noreply, assign(socket, :selected_model, model_id)}
+    StreamingHelpers.handle_select_model(model_id, socket)
   end
 
   @impl true
   def handle_event("new_conversation", _, socket) do
-    user_id = socket.assigns.current_user.id
-
-    {:ok, conversation} =
-      Chat.create_conversation(%{
-        user_id: user_id,
-        title: "New Conversation"
-      })
-
-    {:noreply,
-     socket
-     |> assign(:current_conversation, conversation)
-     |> assign(:messages, [])
-     |> assign(:conversations, Chat.list_conversations(user_id))
-     |> push_navigate(to: ~p"/chat")}
+    StreamingHelpers.handle_new_conversation(socket, ~p"/chat")
   end
 
   @impl true
@@ -386,16 +298,16 @@ defmodule ChatbotWeb.ChatLive.Show do
             </div>
           <% end %>
 
-          <%= if @is_streaming and @streaming_message != "" do %>
+          <%= if @is_streaming and @streaming_chunks != [] do %>
             <div class="chat chat-start">
               <div class="chat-bubble">
-                <div class="whitespace-pre-wrap">{@streaming_message}</div>
+                <div class="whitespace-pre-wrap">{IO.iodata_to_binary(@streaming_chunks)}</div>
                 <span class="loading loading-dots loading-sm"></span>
               </div>
             </div>
           <% end %>
 
-          <%= if @is_streaming and @streaming_message == "" do %>
+          <%= if @is_streaming and @streaming_chunks == [] do %>
             <div class="chat chat-start">
               <div class="chat-bubble">
                 <span class="loading loading-dots loading-md"></span>

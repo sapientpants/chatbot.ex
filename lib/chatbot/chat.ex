@@ -50,16 +50,34 @@ defmodule Chatbot.Chat do
 
   Raises `Ecto.NoResultsError` if the Conversation does not exist or doesn't belong to the user.
 
+  ## Options
+
+    * `:limit` - Maximum number of messages to load (default: 100)
+    * `:offset` - Number of messages to skip (default: 0)
+
   ## Examples
 
       iex> get_conversation_with_messages!(123, user_id)
       %Conversation{messages: [%Message{}, ...]}
 
+      iex> get_conversation_with_messages!(123, user_id, limit: 50)
+      %Conversation{messages: [%Message{}, ...]}
+
   """
-  def get_conversation_with_messages!(id, user_id) do
+  def get_conversation_with_messages!(id, user_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 100)
+    offset = Keyword.get(opts, :offset, 0)
+
+    message_query =
+      from(m in Message,
+        order_by: m.inserted_at,
+        limit: ^limit,
+        offset: ^offset
+      )
+
     Conversation
     |> where([c], c.id == ^id and c.user_id == ^user_id)
-    |> preload([c], messages: ^from(m in Message, order_by: m.inserted_at))
+    |> preload([c], messages: ^message_query)
     |> Repo.one!()
   end
 

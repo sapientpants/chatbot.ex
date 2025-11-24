@@ -23,7 +23,9 @@ config :chatbot, ChatbotWeb.Endpoint,
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
-  secret_key_base: "laJ/nnFMAs/sANeazCb3MD4ATnDuPPRxbp3cuQFBU3prw5VJymtOuIZRKNFUU/gU",
+  secret_key_base:
+    System.get_env("SECRET_KEY_BASE") ||
+      "laJ/nnFMAs/sANeazCb3MD4ATnDuPPRxbp3cuQFBU3prw5VJymtOuIZRKNFUU/gU",
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:chatbot, ~w(--sourcemap=inline --watch)]},
     tailwind: {Tailwind, :install_and_run, [:chatbot, ~w(--watch)]}

@@ -54,14 +54,22 @@ defmodule ChatbotWeb.Plugs.RateLimiter do
   end
 
   @doc """
-  Rate limits message creation to 30 per minute per user.
+  Rate limits message creation to 10 per minute per user with burst protection.
   Can be called from LiveView.
+  Implements two-tier rate limiting:
+  - 10 messages per minute (sustained rate)
+  - 3 messages per 10 seconds (burst rate)
   """
   def check_message_rate_limit(user_id) do
     key = "messages:#{user_id}"
+    burst_key = "messages_burst:#{user_id}"
 
-    case Hammer.check_rate(key, 60_000, 30) do
-      {:allow, _count} -> :ok
+    # Check sustained rate (10 per minute)
+    with {:allow, _count} <- Hammer.check_rate(key, 60_000, 10),
+         # Check burst rate (3 per 10 seconds)
+         {:allow, _count} <- Hammer.check_rate(burst_key, 10_000, 3) do
+      :ok
+    else
       {:deny, _limit} -> {:error, "Rate limit exceeded. Please slow down."}
     end
   end
