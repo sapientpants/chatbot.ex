@@ -13,23 +13,42 @@ defmodule ChatbotWeb.ChatLive.Index do
   @impl true
   def mount(_params, _session, socket) do
     user_id = socket.assigns.current_user.id
+    conversations = Chat.list_conversations(user_id)
 
-    # Create a new conversation for the user
-    {:ok, conversation} =
-      Chat.create_conversation(%{
-        user_id: user_id,
-        title: "New Conversation"
-      })
+    # Use the most recent conversation or create a new one if none exist
+    conversation =
+      case conversations do
+        [most_recent | _] ->
+          most_recent
+
+        [] ->
+          {:ok, new_conversation} =
+            Chat.create_conversation(%{
+              user_id: user_id,
+              title: "New Conversation"
+            })
+
+          new_conversation
+      end
+
+    # Load messages for the conversation
+    messages =
+      if conversation.id do
+        conversation = Chat.get_conversation_with_messages!(conversation.id, user_id)
+        conversation.messages
+      else
+        []
+      end
 
     socket =
       socket
-      |> assign(:conversations, Chat.list_conversations(user_id))
+      |> assign(:conversations, conversations)
       |> assign(:current_conversation, conversation)
-      |> assign(:messages, [])
+      |> assign(:messages, messages)
       |> assign(:streaming_chunks, [])
       |> assign(:is_streaming, false)
       |> assign(:available_models, [])
-      |> assign(:selected_model, nil)
+      |> assign(:selected_model, conversation.model_name)
       |> assign(:models_loading, true)
       |> assign(:streaming_task_pid, nil)
       |> assign(:form, to_form(%{"content" => ""}, as: :message))
