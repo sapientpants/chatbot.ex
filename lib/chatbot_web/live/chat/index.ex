@@ -12,8 +12,6 @@ defmodule ChatbotWeb.ChatLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
-    require Logger
-    Logger.info("[ChatLive.Index] mount called, connected: #{connected?(socket)}")
     user_id = socket.assigns.current_user.id
     conversations = Chat.list_conversations(user_id)
 
@@ -65,8 +63,6 @@ defmodule ChatbotWeb.ChatLive.Index do
 
   @impl true
   def handle_info(:load_models, socket) do
-    require Logger
-    Logger.info("[ChatLive.Index] :load_models called")
     socket = assign(socket, :models_loading, false)
     StreamingHelpers.handle_load_models(socket)
   end
