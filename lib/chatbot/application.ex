@@ -12,8 +12,10 @@ defmodule Chatbot.Application do
       Chatbot.Repo,
       {DNSCluster, query: Application.get_env(:chatbot, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Chatbot.PubSub},
-      # Start a worker by calling: Chatbot.Worker.start_link(arg)
-      # {Chatbot.Worker, arg},
+      # Rate limiting backend
+      {Hammer.Backend.ETS, [expiry_ms: 60_000 * 60 * 4, cleanup_interval_ms: 60_000 * 10]},
+      # Task supervisor for background tasks
+      {Task.Supervisor, name: Chatbot.TaskSupervisor},
       # Start to serve requests, typically the last entry
       ChatbotWeb.Endpoint
     ]

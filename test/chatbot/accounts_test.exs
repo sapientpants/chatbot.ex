@@ -18,10 +18,12 @@ defmodule Chatbot.AccountsTest do
     test "validates email and password when given" do
       {:error, changeset} = Accounts.register_user(%{email: "not valid", password: "short"})
 
-      assert %{
-               email: ["must have the @ sign and no spaces"],
-               password: ["should be at least 12 character(s)"]
-             } = errors_on(changeset)
+      errors = errors_on(changeset)
+      assert errors.email == ["must have the @ sign and no spaces"]
+      assert "should be at least 12 character(s)" in errors.password
+      assert "must contain at least one uppercase letter" in errors.password
+      assert "must contain at least one number" in errors.password
+      assert "must contain at least one special character" in errors.password
     end
 
     test "validates maximum values for email and password for security" do
@@ -106,11 +108,13 @@ defmodule Chatbot.AccountsTest do
   end
 
   describe "generate_user_session_token/1" do
-    test "returns user id as token" do
-      # Tests current MVP implementation that uses user.id as token
+    test "generates a cryptographically secure token" do
       user = user_fixture()
       token = Accounts.generate_user_session_token(user)
-      assert token == user.id
+      assert is_binary(token)
+      assert byte_size(token) > 20
+      # Token should not be the user ID
+      refute token == user.id
     end
   end
 

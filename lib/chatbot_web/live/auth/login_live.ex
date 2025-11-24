@@ -1,4 +1,9 @@
 defmodule ChatbotWeb.LoginLive do
+  @moduledoc """
+  LiveView for user login.
+
+  Renders the login form and redirects to the session controller for authentication.
+  """
   use ChatbotWeb, :live_view
 
   def render(assigns) do

@@ -1,4 +1,9 @@
 defmodule Chatbot.Repo do
+  @moduledoc """
+  Main repository for database access using Ecto.
+
+  Uses PostgreSQL as the database adapter and generates UUIDv7 for primary keys.
+  """
   use Ecto.Repo,
     otp_app: :chatbot,
     adapter: Ecto.Adapters.Postgres

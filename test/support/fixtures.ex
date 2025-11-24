@@ -13,8 +13,9 @@ defmodule Chatbot.Fixtures do
 
   @doc """
   Generate a user password for tests.
+  Meets complexity requirements: uppercase, lowercase, number, and special character.
   """
-  def valid_user_password, do: "hello_world_123"
+  def valid_user_password, do: "Hello_World_123!"
 
   @doc """
   Generate user attributes for registration.

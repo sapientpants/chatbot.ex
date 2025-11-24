@@ -1,4 +1,10 @@
 defmodule ChatbotWeb.ChatLive.Show do
+  @moduledoc """
+  Individual conversation view LiveView.
+
+  Displays a specific conversation with its message history and allows
+  continuing the conversation with streaming AI responses.
+  """
   use ChatbotWeb, :live_view
 
   alias Chatbot.Chat
@@ -7,10 +13,17 @@ defmodule ChatbotWeb.ChatLive.Show do
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     user_id = socket.assigns.current_user.id
-    conversation = Chat.get_conversation_with_messages!(id)
 
-    # Verify the conversation belongs to the current user
-    if conversation.user_id != user_id do
+    # Get conversation with authorization check
+    conversation =
+      try do
+        Chat.get_conversation_with_messages!(id, user_id)
+      rescue
+        Ecto.NoResultsError ->
+          nil
+      end
+
+    if conversation == nil do
       {:ok,
        socket
        |> put_flash(:error, "Conversation not found")
@@ -66,6 +79,7 @@ defmodule ChatbotWeb.ChatLive.Show do
   def handle_info({:done, _}, socket) do
     # Save the complete assistant message
     conversation_id = socket.assigns.current_conversation.id
+    user_id = socket.assigns.current_user.id
     assistant_message = socket.assigns.streaming_message
 
     {:ok, _message} =
@@ -76,7 +90,7 @@ defmodule ChatbotWeb.ChatLive.Show do
       })
 
     # Reload messages
-    conversation = Chat.get_conversation_with_messages!(conversation_id)
+    conversation = Chat.get_conversation_with_messages!(conversation_id, user_id)
 
     {:noreply,
      socket
@@ -101,6 +115,7 @@ defmodule ChatbotWeb.ChatLive.Show do
       {:noreply, socket}
     else
       conversation_id = socket.assigns.current_conversation.id
+      user_id = socket.assigns.current_user.id
 
       # Save user message
       {:ok, _message} =
@@ -111,7 +126,7 @@ defmodule ChatbotWeb.ChatLive.Show do
         })
 
       # Reload conversation with messages
-      conversation = Chat.get_conversation_with_messages!(conversation_id)
+      conversation = Chat.get_conversation_with_messages!(conversation_id, user_id)
       messages = conversation.messages
 
       # Build OpenAI format messages
@@ -134,7 +149,7 @@ defmodule ChatbotWeb.ChatLive.Show do
       # Capture LiveView PID before starting Task
       liveview_pid = self()
 
-      Task.start(fn ->
+      Task.Supervisor.start_child(Chatbot.TaskSupervisor, fn ->
         LMStudio.stream_chat_completion(openai_messages, model, liveview_pid)
       end)
 
@@ -182,7 +197,9 @@ defmodule ChatbotWeb.ChatLive.Show do
 
   @impl true
   def handle_event("confirm_delete_conversation", _, socket) do
-    case Chat.delete_conversation(socket.assigns.current_conversation) do
+    user_id = socket.assigns.current_user.id
+
+    case Chat.delete_conversation(socket.assigns.current_conversation, user_id) do
       {:ok, _} ->
         {:noreply,
          socket

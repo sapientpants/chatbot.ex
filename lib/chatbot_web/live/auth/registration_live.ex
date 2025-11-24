@@ -1,8 +1,14 @@
 defmodule ChatbotWeb.RegistrationLive do
+  @moduledoc """
+  LiveView for user registration.
+
+  Handles user signup with email and password, with rate limiting to prevent abuse.
+  """
   use ChatbotWeb, :live_view
 
   alias Chatbot.Accounts
   alias Chatbot.Accounts.User
+  alias ChatbotWeb.Plugs.RateLimiter
 
   def render(assigns) do
     ~H"""
@@ -48,16 +54,30 @@ defmodule ChatbotWeb.RegistrationLive do
   end
 
   def handle_event("save", %{"user" => user_params}, socket) do
-    case Accounts.register_user(user_params) do
-      {:ok, _user} ->
-        # Log the user in after registration
+    ip =
+      case get_connect_info(socket, :peer_data) do
+        %{address: address} -> address |> Tuple.to_list() |> Enum.join(".")
+        _ -> "unknown"
+      end
+
+    case RateLimiter.check_registration_rate_limit(ip) do
+      :ok ->
+        case Accounts.register_user(user_params) do
+          {:ok, _user} ->
+            {:noreply,
+             socket
+             |> put_flash(:info, "Account created successfully!")
+             |> redirect(to: ~p"/login")}
+
+          {:error, %Ecto.Changeset{} = changeset} ->
+            {:noreply, socket |> assign(check_errors: true) |> assign_form(changeset)}
+        end
+
+      {:error, message} ->
         {:noreply,
          socket
-         |> put_flash(:info, "Account created successfully!")
-         |> redirect(to: ~p"/login")}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, socket |> assign(check_errors: true) |> assign_form(changeset)}
+         |> put_flash(:error, message)
+         |> push_navigate(to: ~p"/register")}
     end
   end
 

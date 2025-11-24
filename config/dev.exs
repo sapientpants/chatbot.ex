@@ -89,3 +89,7 @@ config :swoosh, :api_client, false
 
 # LM Studio configuration
 config :chatbot, :lm_studio_url, System.get_env("LM_STUDIO_URL", "http://localhost:1234/v1")
+
+# Configure Hammer rate limiting for development environment
+config :hammer,
+  backend: {Hammer.Backend.ETS, [expiry_ms: 60_000 * 60 * 4, cleanup_interval_ms: 60_000 * 10]}

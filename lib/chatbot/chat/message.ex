@@ -25,6 +25,7 @@ defmodule Chatbot.Chat.Message do
     message
     |> cast(attrs, [:role, :content, :tokens_used, :conversation_id])
     |> validate_required([:role, :content, :conversation_id])
+    |> validate_length(:content, min: 1, max: 10_000)
     |> validate_inclusion(:role, ["user", "assistant", "system"])
     |> foreign_key_constraint(:conversation_id)
     |> maybe_put_uuid()
