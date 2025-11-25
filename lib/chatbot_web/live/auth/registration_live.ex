@@ -19,7 +19,7 @@ defmodule ChatbotWeb.RegistrationLive do
         <h1 class="text-2xl font-bold text-center mb-2">Register for an account</h1>
         <p class="text-center text-sm mb-6">
           Already registered?
-          <.link navigate={~p"/login"} class="font-semibold text-blue-600 hover:underline">
+          <.link navigate={~p"/login"} class="font-semibold text-primary hover:underline">
             Log in
           </.link>
           to your account now.

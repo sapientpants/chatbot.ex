@@ -47,7 +47,7 @@ defmodule ChatbotWeb.ResetPasswordLive do
         </.form>
 
         <div class="text-center mt-6">
-          <.link navigate={~p"/login"} class="text-sm text-blue-600 hover:underline">
+          <.link navigate={~p"/login"} class="text-sm text-primary hover:underline">
             Back to log in
           </.link>
         </div>

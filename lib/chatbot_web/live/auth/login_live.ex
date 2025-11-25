@@ -15,7 +15,7 @@ defmodule ChatbotWeb.LoginLive do
         <h1 class="text-2xl font-bold text-center mb-2">Log in to account</h1>
         <p class="text-center text-sm mb-6">
           Don't have an account?
-          <.link navigate={~p"/register"} class="font-semibold text-blue-600 hover:underline">
+          <.link navigate={~p"/register"} class="font-semibold text-primary hover:underline">
             Sign up
           </.link>
           for an account now.
@@ -27,7 +27,7 @@ defmodule ChatbotWeb.LoginLive do
 
           <div class="flex items-center justify-between">
             <.input field={@form[:remember_me]} type="checkbox" label="Keep me logged in" />
-            <.link navigate={~p"/forgot-password"} class="text-sm text-blue-600 hover:underline">
+            <.link navigate={~p"/forgot-password"} class="text-sm text-primary hover:underline">
               Forgot password?
             </.link>
           </div>
