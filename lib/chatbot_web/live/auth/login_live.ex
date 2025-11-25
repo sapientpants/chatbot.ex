@@ -8,26 +8,35 @@ defmodule ChatbotWeb.LoginLive do
 
   def render(assigns) do
     ~H"""
-    <div class="mx-auto max-w-sm mt-10">
-      <h1 class="text-2xl font-bold text-center mb-2">Log in to account</h1>
-      <p class="text-center text-sm mb-6">
-        Don't have an account?
-        <.link navigate={~p"/register"} class="font-semibold text-blue-600 hover:underline">
-          Sign up
-        </.link>
-        for an account now.
-      </p>
+    <div class="min-h-screen bg-base-200">
+      <ChatbotWeb.Layouts.navbar current_user={assigns[:current_user]} />
 
-      <.form for={@form} id="login_form" action={~p"/login"} phx-update="ignore" class="space-y-4">
-        <.input field={@form[:email]} type="email" label="Email" required />
-        <.input field={@form[:password]} type="password" label="Password" required />
+      <div class="mx-auto max-w-sm mt-10">
+        <h1 class="text-2xl font-bold text-center mb-2">Log in to account</h1>
+        <p class="text-center text-sm mb-6">
+          Don't have an account?
+          <.link navigate={~p"/register"} class="font-semibold text-blue-600 hover:underline">
+            Sign up
+          </.link>
+          for an account now.
+        </p>
 
-        <.input field={@form[:remember_me]} type="checkbox" label="Keep me logged in" />
+        <.form for={@form} id="login_form" action={~p"/login"} phx-update="ignore" class="space-y-4">
+          <.input field={@form[:email]} type="email" label="Email" required />
+          <.input field={@form[:password]} type="password" label="Password" required />
 
-        <.button phx-disable-with="Logging in..." class="w-full">
-          Log in <span aria-hidden="true">→</span>
-        </.button>
-      </.form>
+          <div class="flex items-center justify-between">
+            <.input field={@form[:remember_me]} type="checkbox" label="Keep me logged in" />
+            <.link navigate={~p"/forgot-password"} class="text-sm text-blue-600 hover:underline">
+              Forgot password?
+            </.link>
+          </div>
+
+          <.button phx-disable-with="Logging in..." class="w-full">
+            Log in <span aria-hidden="true">→</span>
+          </.button>
+        </.form>
+      </div>
     </div>
     """
   end

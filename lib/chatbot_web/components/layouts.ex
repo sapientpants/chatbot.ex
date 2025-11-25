@@ -122,13 +122,18 @@ defmodule ChatbotWeb.Layouts do
   """
   def theme_toggle(assigns) do
     ~H"""
-    <div class="card relative flex flex-row items-center border-2 border-base-300 bg-base-300 rounded-full">
+    <div
+      role="group"
+      aria-label="Theme selection"
+      class="card relative flex flex-row items-center border-2 border-base-300 bg-base-300 rounded-full"
+    >
       <div class="absolute w-1/3 h-full rounded-full border-1 border-base-200 bg-base-100 brightness-200 left-0 [[data-theme=light]_&]:left-1/3 [[data-theme=dark]_&]:left-2/3 transition-[left]" />
 
       <button
         class="flex p-2 cursor-pointer w-1/3"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="system"
+        aria-label="Use system theme"
       >
         <.icon name="hero-computer-desktop-micro" class="size-4 opacity-75 hover:opacity-100" />
       </button>
@@ -137,6 +142,7 @@ defmodule ChatbotWeb.Layouts do
         class="flex p-2 cursor-pointer w-1/3"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="light"
+        aria-label="Use light theme"
       >
         <.icon name="hero-sun-micro" class="size-4 opacity-75 hover:opacity-100" />
       </button>
@@ -145,10 +151,78 @@ defmodule ChatbotWeb.Layouts do
         class="flex p-2 cursor-pointer w-1/3"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="dark"
+        aria-label="Use dark theme"
       >
         <.icon name="hero-moon-micro" class="size-4 opacity-75 hover:opacity-100" />
       </button>
     </div>
+    """
+  end
+
+  @doc """
+  Renders the global navigation header with authentication links.
+
+  Shows different content based on whether a user is logged in:
+  - When logged out: Shows "Log in" and "Sign up" links
+  - When logged in: Shows user email and "Logout" link
+
+  ## Examples
+
+      <.navbar current_user={@current_user} />
+  """
+  attr :current_user, :map, default: nil, doc: "the currently logged in user, if any"
+
+  def navbar(assigns) do
+    ~H"""
+    <!-- Skip to main content link for keyboard users -->
+    <a
+      href="#main-content"
+      class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:btn focus:btn-primary"
+    >
+      Skip to main content
+    </a>
+
+    <header role="banner" class="navbar bg-base-100 border-b border-base-300 px-4 sm:px-6 lg:px-8">
+      <div class="flex-1">
+        <.link
+          navigate={~p"/"}
+          class="flex items-center gap-2 text-xl font-bold"
+          aria-label="Chatbot home"
+        >
+          Chatbot
+        </.link>
+      </div>
+      <div class="flex-none">
+        <nav aria-label="Main navigation">
+          <ul class="menu menu-horizontal px-1 gap-2">
+            <li>
+              <.theme_toggle />
+            </li>
+            <%= if @current_user do %>
+              <li>
+                <span class="text-sm">{@current_user.email}</span>
+              </li>
+              <li>
+                <.link href={~p"/logout"} method="delete" class="btn btn-sm btn-ghost">
+                  Logout
+                </.link>
+              </li>
+            <% else %>
+              <li>
+                <.link navigate={~p"/login"} class="btn btn-sm btn-ghost">
+                  Log in
+                </.link>
+              </li>
+              <li>
+                <.link navigate={~p"/register"} class="btn btn-sm btn-primary">
+                  Sign up
+                </.link>
+              </li>
+            <% end %>
+          </ul>
+        </nav>
+      </div>
+    </header>
     """
   end
 end

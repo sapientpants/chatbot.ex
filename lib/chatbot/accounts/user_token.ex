@@ -12,6 +12,8 @@ defmodule Chatbot.Accounts.UserToken do
 
   # Session tokens expire after 60 days
   @session_validity_in_days 60
+  # Reset password tokens expire after 1 day
+  @reset_password_validity_in_days 1
 
   @primary_key {:id, :binary_id, autogenerate: false}
   @foreign_key_type :binary_id
@@ -52,6 +54,41 @@ defmodule Chatbot.Accounts.UserToken do
       from token in by_token_and_context_query(token, "session"),
         join: user in assoc(token, :user),
         where: token.inserted_at > ago(@session_validity_in_days, "day"),
+        select: user
+
+    {:ok, query}
+  end
+
+  @doc """
+  Builds a token and its hash to be delivered to the user's email for password reset.
+
+  The non-hashed token is sent to the user email while the hashed part is stored in the database.
+  The original token cannot be reconstructed from the hashed version.
+  """
+  def build_hashed_token(user, context) do
+    token = :crypto.strong_rand_bytes(@rand_size)
+    hashed_token = :crypto.hash(@hash_algorithm, token)
+
+    {Base.url_encode64(token, padding: false),
+     %Chatbot.Accounts.UserToken{
+       id: Chatbot.Repo.generate_uuid(),
+       token: hashed_token,
+       context: context,
+       user_id: user.id,
+       inserted_at: DateTime.utc_now() |> DateTime.truncate(:second)
+     }}
+  end
+
+  @doc """
+  Checks if the reset password token is valid and returns its underlying lookup query.
+
+  The query returns the user found by the token, if any.
+  """
+  def verify_reset_password_token_query(token) do
+    query =
+      from token in by_token_and_context_query(token, "reset_password"),
+        join: user in assoc(token, :user),
+        where: token.inserted_at > ago(@reset_password_validity_in_days, "day"),
         select: user
 
     {:ok, query}

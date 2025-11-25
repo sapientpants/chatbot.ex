@@ -1,6 +1,7 @@
 defmodule Chatbot.AccountsTest do
   use Chatbot.DataCase, async: true
 
+  import Ecto.Query
   alias Chatbot.Accounts
   alias Chatbot.Accounts.User
   import Chatbot.Fixtures
@@ -138,6 +139,119 @@ defmodule Chatbot.AccountsTest do
   describe "delete_user_session_token/1" do
     test "returns :ok" do
       assert Accounts.delete_user_session_token("any_token") == :ok
+    end
+  end
+
+  describe "get_user_by_email/1" do
+    test "returns user by email" do
+      user = user_fixture()
+      assert %User{} = Accounts.get_user_by_email(user.email)
+    end
+
+    test "returns nil for unknown email" do
+      assert Accounts.get_user_by_email("unknown@example.com") == nil
+    end
+  end
+
+  describe "deliver_user_reset_password_instructions/2" do
+    test "sends reset instructions and returns ok tuple" do
+      user = user_fixture()
+
+      {:ok, result} =
+        Accounts.deliver_user_reset_password_instructions(user, fn _token -> "url" end)
+
+      assert result.to == user.email
+    end
+  end
+
+  describe "get_user_by_reset_password_token/1" do
+    test "returns user by valid token" do
+      user = user_fixture()
+
+      # The token returned by this function is the encoded token that would be sent to the user
+      {:ok, _} =
+        Accounts.deliver_user_reset_password_instructions(user, fn token ->
+          # Capture the token for testing
+          send(self(), {:reset_token, token})
+          "url"
+        end)
+
+      # Receive the token from the message
+      assert_receive {:reset_token, token}
+
+      assert %User{} = Accounts.get_user_by_reset_password_token(token)
+    end
+
+    test "returns nil for invalid token" do
+      assert Accounts.get_user_by_reset_password_token("invalid") == nil
+    end
+  end
+
+  describe "reset_user_password/2" do
+    test "resets the password" do
+      user = user_fixture()
+      new_password = "NewValidPassword123!"
+
+      {:ok, updated_user} =
+        Accounts.reset_user_password(user, %{
+          password: new_password,
+          password_confirmation: new_password
+        })
+
+      assert updated_user.id == user.id
+      assert Accounts.get_user_by_email_and_password(user.email, new_password)
+    end
+
+    test "deletes all reset password tokens after successful reset" do
+      user = user_fixture()
+      {:ok, _} = Accounts.deliver_user_reset_password_instructions(user, fn token -> token end)
+
+      new_password = "NewValidPassword123!"
+
+      {:ok, _} =
+        Accounts.reset_user_password(user, %{
+          password: new_password,
+          password_confirmation: new_password
+        })
+
+      # Verify all reset password tokens are deleted
+      refute Chatbot.Repo.exists?(
+               from t in Chatbot.Accounts.UserToken,
+                 where: t.user_id == ^user.id and t.context == "reset_password"
+             )
+    end
+
+    test "returns error changeset for invalid password" do
+      user = user_fixture()
+
+      {:error, changeset} =
+        Accounts.reset_user_password(user, %{
+          password: "short",
+          password_confirmation: "short"
+        })
+
+      assert %Ecto.Changeset{} = changeset
+      assert "should be at least 12 character(s)" in errors_on(changeset).password
+    end
+  end
+
+  describe "change_user_password/2" do
+    test "returns a changeset" do
+      user = user_fixture()
+      assert %Ecto.Changeset{} = Accounts.change_user_password(user)
+    end
+
+    test "validates password" do
+      user = user_fixture()
+
+      changeset =
+        Accounts.change_user_password(user, %{
+          password: "short",
+          password_confirmation: "short"
+        })
+
+      refute changeset.valid?
+      assert "should be at least 12 character(s)" in errors_on(changeset).password
     end
   end
 end

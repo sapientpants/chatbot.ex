@@ -51,6 +51,8 @@ defmodule ChatbotWeb.Router do
       on_mount: [{ChatbotWeb.UserAuth, :redirect_if_user_is_authenticated}] do
       live "/register", RegistrationLive
       live "/login", LoginLive
+      live "/forgot-password", ForgotPasswordLive
+      live "/reset-password/:token", ResetPasswordLive
     end
 
     post "/login", UserSessionController, :create
