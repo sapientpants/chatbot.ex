@@ -132,7 +132,9 @@ defmodule ChatbotWeb.RegistrationLive do
             </div>
           </div>
 
-          <.button phx-disable-with="Creating account..." class="w-full">Create an account</.button>
+          <.button variant="primary" phx-disable-with="Creating account..." class="w-full">
+            Create an account
+          </.button>
         </.form>
       </div>
     </div>

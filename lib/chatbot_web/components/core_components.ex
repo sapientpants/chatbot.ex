@@ -96,21 +96,20 @@ defmodule ChatbotWeb.CoreComponents do
 
   def button(%{rest: rest} = assigns) do
     variants = %{"primary" => "btn-primary", nil => "btn-primary btn-soft"}
+    variant_class = Map.fetch!(variants, assigns[:variant])
 
-    assigns =
-      assign_new(assigns, :class, fn ->
-        ["btn", Map.fetch!(variants, assigns[:variant])]
-      end)
+    # Merge button classes with any passed classes
+    assigns = assign(assigns, :btn_class, ["btn", variant_class, assigns[:class]])
 
     if rest[:href] || rest[:navigate] || rest[:patch] do
       ~H"""
-      <.link class={@class} {@rest}>
+      <.link class={@btn_class} {@rest}>
         {render_slot(@inner_block)}
       </.link>
       """
     else
       ~H"""
-      <button class={@class} {@rest}>
+      <button class={@btn_class} {@rest}>
         {render_slot(@inner_block)}
       </button>
       """

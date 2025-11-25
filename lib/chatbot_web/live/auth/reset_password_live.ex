@@ -41,7 +41,7 @@ defmodule ChatbotWeb.ResetPasswordLive do
             autocomplete="new-password"
           />
 
-          <.button phx-disable-with="Resetting..." class="w-full">
+          <.button variant="primary" phx-disable-with="Resetting..." class="w-full">
             Reset password
           </.button>
         </.form>
