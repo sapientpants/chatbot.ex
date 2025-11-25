@@ -51,9 +51,6 @@ defmodule ChatbotWeb.Layouts do
             <a href="https://github.com/phoenixframework/phoenix" class="btn btn-ghost">GitHub</a>
           </li>
           <li>
-            <.theme_toggle />
-          </li>
-          <li>
             <a href="https://hexdocs.pm/phoenix/overview.html" class="btn btn-primary">
               Get Started <span aria-hidden="true">&rarr;</span>
             </a>
@@ -116,59 +113,6 @@ defmodule ChatbotWeb.Layouts do
   end
 
   @doc """
-  Provides dark vs light theme toggle based on themes defined in app.css.
-
-  See <head> in root.html.heex which applies the theme before page load.
-  """
-  def theme_toggle(assigns) do
-    ~H"""
-    <div
-      role="group"
-      aria-label="Theme selection"
-      class="card relative flex flex-row items-center border-2 border-base-300 bg-base-200 rounded-full shadow-sm"
-    >
-      <div class="absolute w-1/3 h-full rounded-full bg-primary shadow-md left-0 [[data-theme=light]_&]:left-1/3 [[data-theme=dark]_&]:left-2/3 transition-all duration-300 ease-in-out" />
-
-      <button
-        class="relative z-10 flex p-2.5 cursor-pointer w-1/3 items-center justify-center transition-all duration-200 hover:scale-110"
-        phx-click={JS.dispatch("phx:set-theme")}
-        data-phx-theme="system"
-        aria-label="Use system theme"
-      >
-        <.icon
-          name="hero-computer-desktop-micro"
-          class="size-4 [[data-theme=system]_&]:text-primary-content text-base-content/60"
-        />
-      </button>
-
-      <button
-        class="relative z-10 flex p-2.5 cursor-pointer w-1/3 items-center justify-center transition-all duration-200 hover:scale-110"
-        phx-click={JS.dispatch("phx:set-theme")}
-        data-phx-theme="light"
-        aria-label="Use light theme"
-      >
-        <.icon
-          name="hero-sun-micro"
-          class="size-4 [[data-theme=light]_&]:text-primary-content text-base-content/60"
-        />
-      </button>
-
-      <button
-        class="relative z-10 flex p-2.5 cursor-pointer w-1/3 items-center justify-center transition-all duration-200 hover:scale-110"
-        phx-click={JS.dispatch("phx:set-theme")}
-        data-phx-theme="dark"
-        aria-label="Use dark theme"
-      >
-        <.icon
-          name="hero-moon-micro"
-          class="size-4 [[data-theme=dark]_&]:text-primary-content text-base-content/60"
-        />
-      </button>
-    </div>
-    """
-  end
-
-  @doc """
   Renders the global navigation header with authentication links.
 
   Shows different content based on whether a user is logged in:
@@ -207,9 +151,6 @@ defmodule ChatbotWeb.Layouts do
       <div class="flex-none">
         <nav aria-label="Main navigation">
           <ul class="menu menu-horizontal px-1 gap-2 items-center">
-            <li>
-              <.theme_toggle />
-            </li>
             <%= if @current_user do %>
               <li>
                 <span class="text-sm px-3 py-2 rounded-lg bg-base-200">{@current_user.email}</span>
