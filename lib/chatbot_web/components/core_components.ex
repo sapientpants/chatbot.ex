@@ -98,8 +98,13 @@ defmodule ChatbotWeb.CoreComponents do
     variants = %{"primary" => "btn-primary", nil => "btn-primary btn-soft"}
     variant_class = Map.fetch!(variants, assigns[:variant])
 
-    # Merge button classes with any passed classes
-    assigns = assign(assigns, :btn_class, ["btn", variant_class, assigns[:class]])
+    # Merge button classes with any passed classes, filtering out nils
+    assigns =
+      assign(
+        assigns,
+        :btn_class,
+        ["btn", variant_class, assigns[:class]] |> Enum.reject(&is_nil/1)
+      )
 
     if rest[:href] || rest[:navigate] || rest[:patch] do
       ~H"""
@@ -438,12 +443,13 @@ defmodule ChatbotWeb.CoreComponents do
   # sobelow_skip ["XSS.Raw"]
   def markdown(assigns) do
     html =
-      assigns.content
-      |> Earmark.as_html!(
-        code_class_prefix: "language-",
-        smartypants: false
-      )
-      |> Phoenix.HTML.raw()
+      case Earmark.as_html(assigns.content,
+             code_class_prefix: "language-",
+             smartypants: false
+           ) do
+        {:ok, html_string, _} -> Phoenix.HTML.raw(html_string)
+        {:error, _html, _errors} -> Phoenix.HTML.raw("<p>Error rendering markdown</p>")
+      end
 
     assigns = assign(assigns, :html, html)
 

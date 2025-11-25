@@ -328,6 +328,7 @@ defmodule ChatbotWeb.ChatLive.Show do
               tabindex="0"
               class="btn btn-sm btn-ghost gap-2 font-normal"
               aria-label="Select AI model"
+              aria-haspopup="true"
             >
               <.icon name="hero-cpu-chip" class="w-4 h-4 text-primary" />
               <span class="hidden sm:inline max-w-[120px] truncate text-base-content/70">
