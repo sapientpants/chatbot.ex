@@ -57,6 +57,7 @@ const Hooks = {
 
   // Auto-grow textarea as user types and handle Enter/Shift+Enter
   AutoGrowTextarea: {
+    MAX_HEIGHT: 200,
     mounted() {
       this.el.addEventListener("input", () => this.resize())
       this.el.addEventListener("keydown", (e) => this.handleKeydown(e))
@@ -65,13 +66,12 @@ const Hooks = {
       this.el.focus()
     },
     updated() {
-      // Reset height after form clears and refocus
+      // Reset height after form clears (don't auto-focus to avoid stealing focus)
       this.resize()
-      this.el.focus()
     },
     resize() {
       this.el.style.height = "auto"
-      this.el.style.height = Math.min(this.el.scrollHeight, 200) + "px"
+      this.el.style.height = Math.min(this.el.scrollHeight, this.MAX_HEIGHT) + "px"
     },
     handleKeydown(e) {
       // Enter without Shift submits the form

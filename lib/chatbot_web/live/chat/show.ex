@@ -544,10 +544,16 @@ defmodule ChatbotWeb.ChatLive.Show do
   defp format_model_name(nil), do: "Select model"
 
   defp format_model_name(name) do
-    name
-    |> String.split("/")
-    |> List.last()
-    |> String.slice(0, 20)
+    short_name =
+      name
+      |> String.split("/")
+      |> List.last()
+
+    if String.length(short_name) > 20 do
+      String.slice(short_name, 0, 17) <> "..."
+    else
+      short_name
+    end
   end
 
   defp format_timestamp(nil), do: ""
