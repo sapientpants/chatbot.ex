@@ -125,35 +125,44 @@ defmodule ChatbotWeb.Layouts do
     <div
       role="group"
       aria-label="Theme selection"
-      class="card relative flex flex-row items-center border-2 border-base-300 bg-base-300 rounded-full"
+      class="card relative flex flex-row items-center border-2 border-base-300 bg-base-200 rounded-full shadow-sm"
     >
-      <div class="absolute w-1/3 h-full rounded-full border-1 border-base-200 bg-base-100 brightness-200 left-0 [[data-theme=light]_&]:left-1/3 [[data-theme=dark]_&]:left-2/3 transition-[left]" />
+      <div class="absolute w-1/3 h-full rounded-full bg-primary shadow-md left-0 [[data-theme=light]_&]:left-1/3 [[data-theme=dark]_&]:left-2/3 transition-all duration-300 ease-in-out" />
 
       <button
-        class="flex p-2 cursor-pointer w-1/3"
+        class="relative z-10 flex p-2.5 cursor-pointer w-1/3 items-center justify-center transition-all duration-200 hover:scale-110"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="system"
         aria-label="Use system theme"
       >
-        <.icon name="hero-computer-desktop-micro" class="size-4 opacity-75 hover:opacity-100" />
+        <.icon
+          name="hero-computer-desktop-micro"
+          class="size-4 [[data-theme=system]_&]:text-primary-content text-base-content/60"
+        />
       </button>
 
       <button
-        class="flex p-2 cursor-pointer w-1/3"
+        class="relative z-10 flex p-2.5 cursor-pointer w-1/3 items-center justify-center transition-all duration-200 hover:scale-110"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="light"
         aria-label="Use light theme"
       >
-        <.icon name="hero-sun-micro" class="size-4 opacity-75 hover:opacity-100" />
+        <.icon
+          name="hero-sun-micro"
+          class="size-4 [[data-theme=light]_&]:text-primary-content text-base-content/60"
+        />
       </button>
 
       <button
-        class="flex p-2 cursor-pointer w-1/3"
+        class="relative z-10 flex p-2.5 cursor-pointer w-1/3 items-center justify-center transition-all duration-200 hover:scale-110"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="dark"
         aria-label="Use dark theme"
       >
-        <.icon name="hero-moon-micro" class="size-4 opacity-75 hover:opacity-100" />
+        <.icon
+          name="hero-moon-micro"
+          class="size-4 [[data-theme=dark]_&]:text-primary-content text-base-content/60"
+        />
       </button>
     </div>
     """
@@ -182,11 +191,14 @@ defmodule ChatbotWeb.Layouts do
       Skip to main content
     </a>
 
-    <header role="banner" class="navbar bg-base-100 border-b border-base-300 px-4 sm:px-6 lg:px-8">
+    <header
+      role="banner"
+      class="navbar bg-base-100 border-b border-base-300 px-4 sm:px-6 lg:px-8 shadow-sm"
+    >
       <div class="flex-1">
         <.link
           navigate={~p"/"}
-          class="flex items-center gap-2 text-xl font-bold"
+          class="flex items-center gap-2 text-xl font-bold hover:text-primary transition-colors"
           aria-label="Chatbot home"
         >
           Chatbot
@@ -194,27 +206,37 @@ defmodule ChatbotWeb.Layouts do
       </div>
       <div class="flex-none">
         <nav aria-label="Main navigation">
-          <ul class="menu menu-horizontal px-1 gap-2">
+          <ul class="menu menu-horizontal px-1 gap-2 items-center">
             <li>
               <.theme_toggle />
             </li>
             <%= if @current_user do %>
               <li>
-                <span class="text-sm">{@current_user.email}</span>
+                <span class="text-sm px-3 py-2 rounded-lg bg-base-200">{@current_user.email}</span>
               </li>
               <li>
-                <.link href={~p"/logout"} method="delete" class="btn btn-sm btn-ghost">
+                <.link
+                  href={~p"/logout"}
+                  method="delete"
+                  class="btn btn-sm btn-ghost hover:btn-error transition-colors"
+                >
                   Logout
                 </.link>
               </li>
             <% else %>
               <li>
-                <.link navigate={~p"/login"} class="btn btn-sm btn-ghost">
+                <.link
+                  navigate={~p"/login"}
+                  class="btn btn-sm btn-ghost hover:bg-base-200 transition-colors"
+                >
                   Log in
                 </.link>
               </li>
               <li>
-                <.link navigate={~p"/register"} class="btn btn-sm btn-primary">
+                <.link
+                  navigate={~p"/register"}
+                  class="btn btn-sm btn-primary shadow-sm hover:shadow-md transition-all"
+                >
                   Sign up
                 </.link>
               </li>
