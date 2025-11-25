@@ -51,6 +51,7 @@ defmodule ChatbotWeb.ChatLive.Index do
       |> assign(:selected_model, conversation.model_name)
       |> assign(:models_loading, true)
       |> assign(:streaming_task_pid, nil)
+      |> assign(:sidebar_open, false)
       |> assign(:form, to_form(%{"content" => ""}, as: :message))
 
     # Load available models asynchronously only on connected mount
@@ -123,21 +124,53 @@ defmodule ChatbotWeb.ChatLive.Index do
   end
 
   @impl true
+  def handle_event("toggle_sidebar", _, socket) do
+    {:noreply, assign(socket, :sidebar_open, !socket.assigns.sidebar_open)}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
-    <div class="flex h-screen bg-base-200">
-      <!-- Sidebar -->
-      <div class="w-64 bg-base-100 border-r border-base-300 flex flex-col">
-        <div class="p-4 border-b border-base-300">
-          <.button phx-click="new_conversation" class="w-full">
+    <div class="flex h-screen bg-base-200 relative">
+      <!-- Mobile Overlay -->
+      <%= if @sidebar_open do %>
+        <div
+          class="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          phx-click="toggle_sidebar"
+        >
+        </div>
+      <% end %>
+      
+    <!-- Sidebar -->
+      <div class={[
+        "w-64 bg-base-100 border-r border-base-300 flex flex-col z-50",
+        "fixed md:relative inset-y-0 left-0",
+        "transform transition-transform duration-200 ease-in-out",
+        (@sidebar_open && "translate-x-0") || "-translate-x-full md:translate-x-0"
+      ]}>
+        <div class="p-4 border-b border-base-300 flex items-center justify-between">
+          <.button phx-click="new_conversation" class="flex-1">
             New Chat
           </.button>
+          <button phx-click="toggle_sidebar" class="ml-2 btn btn-ghost btn-sm md:hidden">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="1.5"
+              stroke="currentColor"
+              class="w-5 h-5"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         <div class="flex-1 overflow-y-auto">
           <%= for conversation <- @conversations do %>
             <.link
               navigate={~p"/chat/#{conversation.id}"}
+              phx-click="toggle_sidebar"
               class={[
                 "block p-3 hover:bg-base-200 border-b border-base-300",
                 conversation.id == @current_conversation.id && "bg-base-200"
@@ -160,20 +193,40 @@ defmodule ChatbotWeb.ChatLive.Index do
       </div>
       
     <!-- Main Chat Area -->
-      <div class="flex-1 flex flex-col">
-        <!-- Header with model selection -->
-        <div class="bg-base-100 border-b border-base-300 p-4 flex items-center justify-between">
-          <h2 class="text-xl font-bold">{@current_conversation.title || "New Conversation"}</h2>
+      <div class="flex-1 flex flex-col w-full md:w-auto">
+        <!-- Header with hamburger menu and model selection -->
+        <div class="bg-base-100 border-b border-base-300 p-4 flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2 flex-1 min-w-0">
+            <button phx-click="toggle_sidebar" class="btn btn-ghost btn-sm md:hidden flex-shrink-0">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke-width="1.5"
+                stroke="currentColor"
+                class="w-5 h-5"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+                />
+              </svg>
+            </button>
+            <h2 class="text-lg md:text-xl font-bold truncate">
+              {@current_conversation.title || "New Conversation"}
+            </h2>
+          </div>
 
-          <div class="flex items-center gap-2">
-            <label class="text-sm">Model:</label>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <label class="text-xs md:text-sm hidden sm:inline">Model:</label>
             <%= if @models_loading do %>
               <span class="loading loading-spinner loading-sm"></span>
             <% else %>
               <select
                 phx-change="select_model"
                 name="model"
-                class="select select-sm select-bordered"
+                class="select select-xs md:select-sm select-bordered"
                 disabled={@is_streaming}
               >
                 <%= for model <- @available_models do %>
