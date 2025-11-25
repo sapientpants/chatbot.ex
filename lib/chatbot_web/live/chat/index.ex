@@ -152,7 +152,7 @@ defmodule ChatbotWeb.ChatLive.Index do
           (@sidebar_open && "translate-x-0") || "-translate-x-full md:translate-x-0"
         ]}
       >
-        <div class="p-4 border-b border-base-300 flex items-center justify-between">
+        <div class="h-[61px] px-4 border-b border-base-300 flex items-center justify-between">
           <.button phx-click="new_conversation" class="flex-1">
             New Chat
           </.button>
@@ -232,8 +232,8 @@ defmodule ChatbotWeb.ChatLive.Index do
             </h2>
           </div>
 
-          <div class="flex items-center gap-2 flex-shrink-0">
-            <label for="model-select" class="text-xs md:text-sm hidden sm:inline">Model:</label>
+          <div class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+            <label for="model-select" class="text-xs hidden sm:inline">Model:</label>
             <%= if @models_loading do %>
               <span class="loading loading-spinner loading-sm" aria-label="Loading models"></span>
             <% else %>
@@ -241,7 +241,7 @@ defmodule ChatbotWeb.ChatLive.Index do
                 id="model-select"
                 phx-change="select_model"
                 name="model"
-                class="select select-xs md:select-sm select-bordered"
+                class="select select-xs select-bordered max-w-[120px] sm:max-w-none"
                 disabled={@is_streaming}
                 aria-label="Select AI model"
               >
@@ -287,27 +287,37 @@ defmodule ChatbotWeb.ChatLive.Index do
               </div>
             </div>
           <% end %>
-        </div>
-        
+          
     <!-- Input Form -->
-        <div class="bg-base-100 border-t border-base-300 p-4">
-          <.form for={@form} phx-submit="send_message" class="flex gap-2" aria-label="Send message">
-            <.input
-              field={@form[:content]}
-              type="textarea"
-              placeholder="Type your message..."
-              class="flex-1"
-              disabled={@is_streaming}
-              aria-label="Message input"
-            />
-            <.button type="submit" disabled={@is_streaming} aria-label="Send message">
-              <%= if @is_streaming do %>
-                <span class="loading loading-spinner" aria-label="Sending"></span>
-              <% else %>
-                Send
-              <% end %>
-            </.button>
-          </.form>
+          <div class="pt-4">
+            <.form
+              for={@form}
+              phx-submit="send_message"
+              class="flex flex-col sm:flex-row gap-2"
+              aria-label="Send message"
+            >
+              <.input
+                field={@form[:content]}
+                type="textarea"
+                placeholder="Type your message..."
+                class="flex-1 min-w-0"
+                disabled={@is_streaming}
+                aria-label="Message input"
+              />
+              <.button
+                type="submit"
+                disabled={@is_streaming}
+                aria-label="Send message"
+                class="btn btn-primary sm:self-end"
+              >
+                <%= if @is_streaming do %>
+                  <span class="loading loading-spinner" aria-label="Sending"></span>
+                <% else %>
+                  Send
+                <% end %>
+              </.button>
+            </.form>
+          </div>
         </div>
       </main>
     </div>
