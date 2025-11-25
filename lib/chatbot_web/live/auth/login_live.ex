@@ -25,7 +25,12 @@ defmodule ChatbotWeb.LoginLive do
           <.input field={@form[:email]} type="email" label="Email" required />
           <.input field={@form[:password]} type="password" label="Password" required />
 
-          <.input field={@form[:remember_me]} type="checkbox" label="Keep me logged in" />
+          <div class="flex items-center justify-between">
+            <.input field={@form[:remember_me]} type="checkbox" label="Keep me logged in" />
+            <.link navigate={~p"/forgot-password"} class="text-sm text-blue-600 hover:underline">
+              Forgot password?
+            </.link>
+          </div>
 
           <.button phx-disable-with="Logging in..." class="w-full">
             Log in <span aria-hidden="true">→</span>
