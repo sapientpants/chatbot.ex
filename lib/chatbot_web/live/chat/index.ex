@@ -137,22 +137,30 @@ defmodule ChatbotWeb.ChatLive.Index do
         <div
           class="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
           phx-click="toggle_sidebar"
+          aria-label="Close sidebar"
         >
         </div>
       <% end %>
       
     <!-- Sidebar -->
-      <div class={[
-        "w-64 bg-base-100 border-r border-base-300 flex flex-col z-50",
-        "fixed md:relative inset-y-0 left-0",
-        "transform transition-transform duration-200 ease-in-out",
-        (@sidebar_open && "translate-x-0") || "-translate-x-full md:translate-x-0"
-      ]}>
+      <aside
+        aria-label="Conversations"
+        class={[
+          "w-64 bg-base-100 border-r border-base-300 flex flex-col z-50",
+          "fixed md:relative inset-y-0 left-0",
+          "transform transition-transform duration-200 ease-in-out",
+          (@sidebar_open && "translate-x-0") || "-translate-x-full md:translate-x-0"
+        ]}
+      >
         <div class="p-4 border-b border-base-300 flex items-center justify-between">
           <.button phx-click="new_conversation" class="flex-1">
             New Chat
           </.button>
-          <button phx-click="toggle_sidebar" class="ml-2 btn btn-ghost btn-sm md:hidden">
+          <button
+            phx-click="toggle_sidebar"
+            class="ml-2 btn btn-ghost btn-sm md:hidden"
+            aria-label="Close sidebar"
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
@@ -160,6 +168,7 @@ defmodule ChatbotWeb.ChatLive.Index do
               stroke-width="1.5"
               stroke="currentColor"
               class="w-5 h-5"
+              aria-hidden="true"
             >
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -190,14 +199,18 @@ defmodule ChatbotWeb.ChatLive.Index do
             Logout
           </.link>
         </div>
-      </div>
+      </aside>
       
     <!-- Main Chat Area -->
-      <div class="flex-1 flex flex-col w-full md:w-auto">
+      <main id="main-content" class="flex-1 flex flex-col w-full md:w-auto">
         <!-- Header with hamburger menu and model selection -->
         <div class="bg-base-100 border-b border-base-300 p-4 flex items-center justify-between gap-2">
           <div class="flex items-center gap-2 flex-1 min-w-0">
-            <button phx-click="toggle_sidebar" class="btn btn-ghost btn-sm md:hidden flex-shrink-0">
+            <button
+              phx-click="toggle_sidebar"
+              class="btn btn-ghost btn-sm md:hidden flex-shrink-0"
+              aria-label="Open sidebar"
+            >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
@@ -205,6 +218,7 @@ defmodule ChatbotWeb.ChatLive.Index do
                 stroke-width="1.5"
                 stroke="currentColor"
                 class="w-5 h-5"
+                aria-hidden="true"
               >
                 <path
                   stroke-linecap="round"
@@ -219,15 +233,17 @@ defmodule ChatbotWeb.ChatLive.Index do
           </div>
 
           <div class="flex items-center gap-2 flex-shrink-0">
-            <label class="text-xs md:text-sm hidden sm:inline">Model:</label>
+            <label for="model-select" class="text-xs md:text-sm hidden sm:inline">Model:</label>
             <%= if @models_loading do %>
-              <span class="loading loading-spinner loading-sm"></span>
+              <span class="loading loading-spinner loading-sm" aria-label="Loading models"></span>
             <% else %>
               <select
+                id="model-select"
                 phx-change="select_model"
                 name="model"
                 class="select select-xs md:select-sm select-bordered"
                 disabled={@is_streaming}
+                aria-label="Select AI model"
               >
                 <%= for model <- @available_models do %>
                   <option value={model} selected={model == @selected_model}>
@@ -240,7 +256,13 @@ defmodule ChatbotWeb.ChatLive.Index do
         </div>
         
     <!-- Messages -->
-        <div class="flex-1 overflow-y-auto p-4 space-y-4" id="messages-container">
+        <div
+          class="flex-1 overflow-y-auto p-4 space-y-4"
+          id="messages-container"
+          role="log"
+          aria-label="Chat messages"
+          aria-live="polite"
+        >
           <%= for message <- @messages do %>
             <div class={["chat", (message.role == "user" && "chat-end") || "chat-start"]}>
               <div class="chat-bubble">
@@ -269,24 +291,25 @@ defmodule ChatbotWeb.ChatLive.Index do
         
     <!-- Input Form -->
         <div class="bg-base-100 border-t border-base-300 p-4">
-          <.form for={@form} phx-submit="send_message" class="flex gap-2">
+          <.form for={@form} phx-submit="send_message" class="flex gap-2" aria-label="Send message">
             <.input
               field={@form[:content]}
               type="textarea"
               placeholder="Type your message..."
               class="flex-1"
               disabled={@is_streaming}
+              aria-label="Message input"
             />
-            <.button type="submit" disabled={@is_streaming}>
+            <.button type="submit" disabled={@is_streaming} aria-label="Send message">
               <%= if @is_streaming do %>
-                <span class="loading loading-spinner"></span>
+                <span class="loading loading-spinner" aria-label="Sending"></span>
               <% else %>
                 Send
               <% end %>
             </.button>
           </.form>
         </div>
-      </div>
+      </main>
     </div>
     """
   end

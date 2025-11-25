@@ -217,22 +217,30 @@ defmodule ChatbotWeb.ChatLive.Show do
         <div
           class="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
           phx-click="toggle_sidebar"
+          aria-label="Close sidebar"
         >
         </div>
       <% end %>
       
     <!-- Sidebar -->
-      <div class={[
-        "w-64 bg-base-100 border-r border-base-300 flex flex-col z-50",
-        "fixed md:relative inset-y-0 left-0",
-        "transform transition-transform duration-200 ease-in-out",
-        (@sidebar_open && "translate-x-0") || "-translate-x-full md:translate-x-0"
-      ]}>
+      <aside
+        aria-label="Conversations"
+        class={[
+          "w-64 bg-base-100 border-r border-base-300 flex flex-col z-50",
+          "fixed md:relative inset-y-0 left-0",
+          "transform transition-transform duration-200 ease-in-out",
+          (@sidebar_open && "translate-x-0") || "-translate-x-full md:translate-x-0"
+        ]}
+      >
         <div class="p-4 border-b border-base-300 flex items-center justify-between">
           <.button phx-click="new_conversation" class="flex-1">
             New Chat
           </.button>
-          <button phx-click="toggle_sidebar" class="ml-2 btn btn-ghost btn-sm md:hidden">
+          <button
+            phx-click="toggle_sidebar"
+            class="ml-2 btn btn-ghost btn-sm md:hidden"
+            aria-label="Close sidebar"
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
@@ -240,13 +248,14 @@ defmodule ChatbotWeb.ChatLive.Show do
               stroke-width="1.5"
               stroke="currentColor"
               class="w-5 h-5"
+              aria-hidden="true"
             >
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        <div class="flex-1 overflow-y-auto">
+        <nav aria-label="Conversation list" class="flex-1 overflow-y-auto">
           <%= for conversation <- @conversations do %>
             <.link
               navigate={~p"/chat/#{conversation.id}"}
@@ -262,7 +271,7 @@ defmodule ChatbotWeb.ChatLive.Show do
               </div>
             </.link>
           <% end %>
-        </div>
+        </nav>
 
         <div class="p-4 border-t border-base-300">
           <div class="text-sm text-gray-600">{@current_user.email}</div>
@@ -270,14 +279,18 @@ defmodule ChatbotWeb.ChatLive.Show do
             Logout
           </.link>
         </div>
-      </div>
+      </aside>
       
     <!-- Main Chat Area -->
-      <div class="flex-1 flex flex-col w-full md:w-auto">
+      <main id="main-content" class="flex-1 flex flex-col w-full md:w-auto">
         <!-- Header with hamburger menu, model selection and actions -->
         <div class="bg-base-100 border-b border-base-300 p-4 flex items-center justify-between gap-2">
           <div class="flex items-center gap-2 flex-1 min-w-0">
-            <button phx-click="toggle_sidebar" class="btn btn-ghost btn-sm md:hidden flex-shrink-0">
+            <button
+              phx-click="toggle_sidebar"
+              class="btn btn-ghost btn-sm md:hidden flex-shrink-0"
+              aria-label="Open sidebar"
+            >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
@@ -285,6 +298,7 @@ defmodule ChatbotWeb.ChatLive.Show do
                 stroke-width="1.5"
                 stroke="currentColor"
                 class="w-5 h-5"
+                aria-hidden="true"
               >
                 <path
                   stroke-linecap="round"
@@ -300,15 +314,19 @@ defmodule ChatbotWeb.ChatLive.Show do
 
           <div class="flex items-center gap-2 md:gap-4 flex-shrink-0">
             <div class="flex items-center gap-2">
-              <label class="text-xs md:text-sm hidden sm:inline">Model:</label>
+              <label for="model-select-show" class="text-xs md:text-sm hidden sm:inline">
+                Model:
+              </label>
               <%= if @models_loading do %>
-                <span class="loading loading-spinner loading-sm"></span>
+                <span class="loading loading-spinner loading-sm" aria-label="Loading models"></span>
               <% else %>
                 <select
+                  id="model-select-show"
                   phx-change="select_model"
                   name="model"
                   class="select select-xs md:select-sm select-bordered"
                   disabled={@is_streaming}
+                  aria-label="Select AI model"
                 >
                   <%= for model <- @available_models do %>
                     <option value={model} selected={model == @selected_model}>
@@ -320,21 +338,26 @@ defmodule ChatbotWeb.ChatLive.Show do
             </div>
 
             <div class="dropdown dropdown-end">
-              <label tabindex="0" class="btn btn-xs md:btn-sm btn-ghost">
+              <label
+                tabindex="0"
+                class="btn btn-xs md:btn-sm btn-ghost"
+                aria-label="Conversation actions"
+              >
                 Actions
               </label>
               <ul
                 tabindex="0"
                 class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52"
+                role="menu"
               >
-                <li>
-                  <a phx-click="export_markdown">Export as Markdown</a>
+                <li role="none">
+                  <a phx-click="export_markdown" role="menuitem">Export as Markdown</a>
                 </li>
-                <li>
-                  <a phx-click="export_json">Export as JSON</a>
+                <li role="none">
+                  <a phx-click="export_json" role="menuitem">Export as JSON</a>
                 </li>
-                <li>
-                  <a phx-click="show_delete_modal">
+                <li role="none">
+                  <a phx-click="show_delete_modal" role="menuitem">
                     Delete Conversation
                   </a>
                 </li>
@@ -344,7 +367,13 @@ defmodule ChatbotWeb.ChatLive.Show do
         </div>
         
     <!-- Messages -->
-        <div class="flex-1 overflow-y-auto p-4 space-y-4" id="messages-container">
+        <div
+          class="flex-1 overflow-y-auto p-4 space-y-4"
+          id="messages-container"
+          role="log"
+          aria-label="Chat messages"
+          aria-live="polite"
+        >
           <%= for message <- @messages do %>
             <div class={["chat", (message.role == "user" && "chat-end") || "chat-start"]}>
               <div class="chat-bubble">
@@ -373,30 +402,31 @@ defmodule ChatbotWeb.ChatLive.Show do
         
     <!-- Input Form -->
         <div class="bg-base-100 border-t border-base-300 p-4">
-          <.form for={@form} phx-submit="send_message" class="flex gap-2">
+          <.form for={@form} phx-submit="send_message" class="flex gap-2" aria-label="Send message">
             <.input
               field={@form[:content]}
               type="textarea"
               placeholder="Type your message..."
               class="flex-1"
               disabled={@is_streaming}
+              aria-label="Message input"
             />
-            <.button type="submit" disabled={@is_streaming}>
+            <.button type="submit" disabled={@is_streaming} aria-label="Send message">
               <%= if @is_streaming do %>
-                <span class="loading loading-spinner"></span>
+                <span class="loading loading-spinner" aria-label="Sending"></span>
               <% else %>
                 Send
               <% end %>
             </.button>
           </.form>
         </div>
-      </div>
+      </main>
       
     <!-- Delete Confirmation Modal -->
       <%= if @show_delete_modal do %>
-        <div class="modal modal-open">
+        <div class="modal modal-open" role="dialog" aria-labelledby="modal-title" aria-modal="true">
           <div class="modal-box">
-            <h3 class="font-bold text-lg">Delete Conversation?</h3>
+            <h3 id="modal-title" class="font-bold text-lg">Delete Conversation?</h3>
             <p class="py-4">
               Are you sure you want to delete "{@current_conversation.title}"? This action cannot be undone.
             </p>
