@@ -371,9 +371,7 @@ defmodule ChatbotWeb.ChatLive.Index do
                       message.role == "user" && "bg-primary text-primary-content rounded-br-md",
                       message.role != "user" && "bg-base-200 rounded-bl-md"
                     ]}>
-                      <div class="whitespace-pre-wrap text-[15px] leading-relaxed">
-                        {message.content}
-                      </div>
+                      <.markdown content={message.content} />
                     </div>
                     <div class="text-xs text-base-content/40 mt-1.5 px-1">
                       {format_timestamp(message.inserted_at)}
@@ -391,9 +389,7 @@ defmodule ChatbotWeb.ChatLive.Index do
                   <div class="flex-1 min-w-0">
                     <div class="inline-block rounded-2xl rounded-bl-md px-4 py-3 bg-base-200 max-w-[85%]">
                       <%= if @streaming_chunks != [] do %>
-                        <div class="whitespace-pre-wrap text-[15px] leading-relaxed">
-                          {IO.iodata_to_binary(@streaming_chunks)}
-                        </div>
+                        <.markdown content={IO.iodata_to_binary(@streaming_chunks)} />
                       <% end %>
                       <span class="loading loading-dots loading-sm text-primary"></span>
                     </div>

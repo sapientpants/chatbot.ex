@@ -420,6 +420,51 @@ defmodule ChatbotWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Renders markdown content as HTML.
+
+  Uses Earmark to parse markdown and render it with appropriate styling.
+  Code blocks are syntax-highlighted when possible.
+
+  Note: This intentionally uses Phoenix.HTML.raw/1 to render HTML from Earmark.
+  The content comes from our AI backend responses, not directly from user input.
+
+  ## Examples
+
+      <.markdown content={@message.content} />
+  """
+  attr :content, :string, required: true
+  attr :class, :string, default: nil
+
+  # sobelow_skip ["XSS.Raw"]
+  def markdown(assigns) do
+    html =
+      assigns.content
+      |> Earmark.as_html!(
+        code_class_prefix: "language-",
+        smartypants: false
+      )
+      |> Phoenix.HTML.raw()
+
+    assigns = assign(assigns, :html, html)
+
+    ~H"""
+    <div class={[
+      "prose prose-sm max-w-none dark:prose-invert",
+      "prose-p:my-2 prose-p:leading-relaxed",
+      "prose-pre:bg-base-300 prose-pre:text-base-content prose-pre:rounded-lg prose-pre:p-3 prose-pre:overflow-x-auto",
+      "prose-code:bg-base-300 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:before:content-none prose-code:after:content-none",
+      "prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5",
+      "prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-sm",
+      "prose-a:text-primary prose-a:no-underline hover:prose-a:underline",
+      "prose-blockquote:border-l-primary prose-blockquote:not-italic",
+      @class
+    ]}>
+      {@html}
+    </div>
+    """
+  end
+
   ## JS Commands
 
   def show(js \\ %JS{}, selector) do

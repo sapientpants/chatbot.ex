@@ -29,15 +29,27 @@ import topbar from "../vendor/topbar"
 const Hooks = {
   ...colocatedHooks,
 
-  // Auto-grow textarea as user types
+  // Auto-grow textarea as user types and handle Enter/Shift+Enter
   AutoGrowTextarea: {
     mounted() {
       this.el.addEventListener("input", () => this.resize())
+      this.el.addEventListener("keydown", (e) => this.handleKeydown(e))
       this.resize()
     },
     resize() {
       this.el.style.height = "auto"
       this.el.style.height = Math.min(this.el.scrollHeight, 200) + "px"
+    },
+    handleKeydown(e) {
+      // Enter without Shift submits the form
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault()
+        const form = this.el.closest("form")
+        if (form && this.el.value.trim()) {
+          form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))
+        }
+      }
+      // Shift+Enter adds a newline (default behavior, no need to handle)
     }
   },
 
