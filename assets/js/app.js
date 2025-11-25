@@ -61,6 +61,13 @@ const Hooks = {
       this.el.addEventListener("input", () => this.resize())
       this.el.addEventListener("keydown", (e) => this.handleKeydown(e))
       this.resize()
+      // Focus the textarea on mount
+      this.el.focus()
+    },
+    updated() {
+      // Reset height after form clears and refocus
+      this.resize()
+      this.el.focus()
     },
     resize() {
       this.el.style.height = "auto"
