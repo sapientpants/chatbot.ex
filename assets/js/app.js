@@ -28,6 +28,31 @@ import topbar from "../vendor/topbar"
 // Custom hooks
 const Hooks = {
   ...colocatedHooks,
+
+  // Auto-grow textarea as user types
+  AutoGrowTextarea: {
+    mounted() {
+      this.el.addEventListener("input", () => this.resize())
+      this.resize()
+    },
+    resize() {
+      this.el.style.height = "auto"
+      this.el.style.height = Math.min(this.el.scrollHeight, 200) + "px"
+    }
+  },
+
+  // Scroll to bottom when new messages arrive
+  ScrollToBottom: {
+    mounted() {
+      this.scrollToBottom()
+    },
+    updated() {
+      this.scrollToBottom()
+    },
+    scrollToBottom() {
+      this.el.scrollTop = this.el.scrollHeight
+    }
+  }
 }
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")

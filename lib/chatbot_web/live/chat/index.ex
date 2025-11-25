@@ -131,11 +131,11 @@ defmodule ChatbotWeb.ChatLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="flex h-screen bg-base-200 relative">
+    <div class="flex h-screen bg-base-100 relative">
       <!-- Mobile Overlay -->
       <%= if @sidebar_open do %>
         <div
-          class="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          class="fixed inset-0 bg-black/50 z-40 md:hidden"
           phx-click="toggle_sidebar"
           aria-label="Close sidebar"
         >
@@ -146,181 +146,287 @@ defmodule ChatbotWeb.ChatLive.Index do
       <aside
         aria-label="Conversations"
         class={[
-          "w-64 bg-base-100 border-r border-base-300 flex flex-col z-50",
+          "w-72 bg-base-200 border-r border-base-300 flex flex-col z-50",
           "fixed md:relative inset-y-0 left-0",
           "transform transition-transform duration-200 ease-in-out",
           (@sidebar_open && "translate-x-0") || "-translate-x-full md:translate-x-0"
         ]}
       >
-        <div class="h-[61px] px-4 border-b border-base-300 flex items-center justify-between">
-          <.button phx-click="new_conversation" class="flex-1">
-            New Chat
+        <!-- Sidebar Header -->
+        <div class="h-[61px] px-4 border-b border-base-300 flex items-center gap-2">
+          <.button phx-click="new_conversation" class="flex-1 gap-2">
+            <.icon name="hero-plus" class="w-4 h-4" /> New Chat
           </.button>
           <button
             phx-click="toggle_sidebar"
-            class="ml-2 btn btn-ghost btn-sm md:hidden"
+            class="btn btn-ghost btn-sm btn-square md:hidden"
             aria-label="Close sidebar"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke-width="1.5"
-              stroke="currentColor"
-              class="w-5 h-5"
-              aria-hidden="true"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <.icon name="hero-x-mark" class="w-5 h-5" />
           </button>
         </div>
-
+        
+    <!-- Conversations List -->
         <div class="flex-1 overflow-y-auto">
           <%= for conversation <- @conversations do %>
             <.link
               navigate={~p"/chat/#{conversation.id}"}
               phx-click="toggle_sidebar"
               class={[
-                "block p-3 hover:bg-base-200 border-b border-base-300",
-                conversation.id == @current_conversation.id && "bg-base-200"
+                "block p-3 hover:bg-base-300 border-b border-base-300 transition-colors",
+                conversation.id == @current_conversation.id && "bg-base-300"
               ]}
             >
-              <div class="font-medium truncate">{conversation.title || "New Conversation"}</div>
-              <div class="text-xs text-gray-500">
+              <div class="flex items-center gap-2">
+                <.icon name="hero-chat-bubble-left-right" class="w-4 h-4 text-base-content/50" />
+                <span class="font-medium truncate flex-1">
+                  {conversation.title || "New Conversation"}
+                </span>
+              </div>
+              <div class="text-xs text-base-content/50 mt-1 ml-6">
                 {Calendar.strftime(conversation.updated_at, "%b %d, %Y")}
               </div>
             </.link>
           <% end %>
         </div>
-
-        <div class="p-4 border-t border-base-300">
-          <div class="text-sm text-gray-600">{@current_user.email}</div>
-          <.link href={~p"/logout"} method="delete" class="text-sm text-blue-600 hover:underline">
-            Logout
-          </.link>
+        
+    <!-- User Section -->
+        <div class="p-3 border-t border-base-300 bg-base-300/50">
+          <div class="flex items-center gap-3">
+            <div class="avatar placeholder">
+              <div class="bg-primary text-primary-content rounded-full w-10">
+                <span class="text-sm font-bold">
+                  {String.first(@current_user.email) |> String.upcase()}
+                </span>
+              </div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium truncate">{@current_user.email}</div>
+            </div>
+            <.link
+              href={~p"/logout"}
+              method="delete"
+              class="btn btn-ghost btn-sm btn-square"
+              aria-label="Logout"
+            >
+              <.icon name="hero-arrow-right-on-rectangle" class="w-5 h-5" />
+            </.link>
+          </div>
         </div>
       </aside>
       
     <!-- Main Chat Area -->
-      <main id="main-content" class="flex-1 flex flex-col w-full md:w-auto">
-        <!-- Header with hamburger menu and model selection -->
-        <div class="bg-base-100 border-b border-base-300 p-4 flex items-center justify-between gap-2">
-          <div class="flex items-center gap-2 flex-1 min-w-0">
-            <button
-              phx-click="toggle_sidebar"
-              class="btn btn-ghost btn-sm md:hidden flex-shrink-0"
-              aria-label="Open sidebar"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke-width="1.5"
-                stroke="currentColor"
-                class="w-5 h-5"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-                />
-              </svg>
-            </button>
-            <h2 class="text-lg md:text-xl font-bold truncate">
-              {@current_conversation.title || "New Conversation"}
-            </h2>
-          </div>
+      <main id="main-content" class="flex-1 flex flex-col w-full md:w-auto bg-base-100">
+        <!-- Header -->
+        <div class="h-[61px] bg-base-100 border-b border-base-300 px-4 flex items-center gap-3">
+          <button
+            phx-click="toggle_sidebar"
+            class="btn btn-ghost btn-sm btn-square md:hidden"
+            aria-label="Open sidebar"
+          >
+            <.icon name="hero-bars-3" class="w-5 h-5" />
+          </button>
 
-          <div class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-            <label for="model-select" class="text-xs hidden sm:inline">Model:</label>
-            <%= if @models_loading do %>
-              <span class="loading loading-spinner loading-sm" aria-label="Loading models"></span>
-            <% else %>
-              <select
-                id="model-select"
-                phx-change="select_model"
-                name="model"
-                class="select select-xs select-bordered max-w-[120px] sm:max-w-none"
-                disabled={@is_streaming}
-                aria-label="Select AI model"
+          <h2 class="text-lg font-semibold truncate flex-1">
+            {@current_conversation.title || "New Conversation"}
+          </h2>
+          
+    <!-- Model Selector Dropdown -->
+          <div class="dropdown dropdown-end">
+            <div
+              tabindex="0"
+              role="button"
+              class="btn btn-ghost btn-sm gap-1"
+              aria-label="Select AI model"
+            >
+              <.icon name="hero-cpu-chip" class="w-4 h-4" />
+              <span class="hidden sm:inline max-w-[150px] truncate">
+                {format_model_name(@selected_model)}
+              </span>
+              <.icon name="hero-chevron-down" class="w-3 h-3" />
+            </div>
+            <%= if not @models_loading do %>
+              <ul
+                tabindex="0"
+                class="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-64 border border-base-300"
               >
                 <%= for model <- @available_models do %>
-                  <option value={model} selected={model == @selected_model}>
-                    {model}
-                  </option>
+                  <li>
+                    <button
+                      phx-click="select_model"
+                      phx-value-model={model}
+                      class={["text-left", model == @selected_model && "active"]}
+                      disabled={@is_streaming}
+                    >
+                      <.icon name="hero-cpu-chip" class="w-4 h-4" />
+                      <span class="truncate">{model}</span>
+                      <%= if model == @selected_model do %>
+                        <.icon name="hero-check" class="w-4 h-4 ml-auto" />
+                      <% end %>
+                    </button>
+                  </li>
                 <% end %>
-              </select>
+              </ul>
             <% end %>
           </div>
         </div>
         
-    <!-- Messages -->
-        <div
-          class="flex-1 overflow-y-auto p-4 space-y-4"
-          id="messages-container"
-          role="log"
-          aria-label="Chat messages"
-          aria-live="polite"
-        >
-          <%= for message <- @messages do %>
-            <div class={["chat", (message.role == "user" && "chat-end") || "chat-start"]}>
-              <div class="chat-bubble">
-                <div class="whitespace-pre-wrap">{message.content}</div>
+    <!-- Chat Content -->
+        <%= if @messages == [] and not @is_streaming do %>
+          <!-- Empty State - Centered Input -->
+          <div class="flex-1 flex flex-col items-center justify-center p-4">
+            <div class="text-center mb-8">
+              <div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                <.icon name="hero-chat-bubble-bottom-center-text" class="w-8 h-8 text-primary" />
               </div>
+              <h3 class="text-xl font-semibold mb-2">Start a conversation</h3>
+              <p class="text-base-content/60 max-w-md">
+                Ask me anything! I can help with coding, writing, analysis, and much more.
+              </p>
             </div>
-          <% end %>
 
-          <%= if @is_streaming and @streaming_chunks != [] do %>
-            <div class="chat chat-start">
-              <div class="chat-bubble">
-                <div class="whitespace-pre-wrap">{IO.iodata_to_binary(@streaming_chunks)}</div>
-                <span class="loading loading-dots loading-sm"></span>
-              </div>
-            </div>
-          <% end %>
-
-          <%= if @is_streaming and @streaming_chunks == [] do %>
-            <div class="chat chat-start">
-              <div class="chat-bubble">
-                <span class="loading loading-dots loading-md"></span>
-              </div>
-            </div>
-          <% end %>
-          
-    <!-- Input Form -->
-          <div class="pt-4">
-            <.form
-              for={@form}
-              phx-submit="send_message"
-              class="flex flex-col sm:flex-row gap-2"
-              aria-label="Send message"
-            >
-              <.input
-                field={@form[:content]}
-                type="textarea"
-                placeholder="Type your message..."
-                class="flex-1 min-w-0"
-                disabled={@is_streaming}
-                aria-label="Message input"
-              />
-              <.button
-                type="submit"
-                disabled={@is_streaming}
+            <div class="w-full max-w-2xl">
+              <.form
+                for={@form}
+                phx-submit="send_message"
+                class="flex flex-col gap-3"
                 aria-label="Send message"
-                class="btn btn-primary sm:self-end"
               >
-                <%= if @is_streaming do %>
-                  <span class="loading loading-spinner" aria-label="Sending"></span>
-                <% else %>
-                  Send
-                <% end %>
-              </.button>
-            </.form>
+                <textarea
+                  name="message[content]"
+                  placeholder="Type your message..."
+                  rows="3"
+                  class="textarea textarea-bordered w-full text-base resize-none focus:textarea-primary"
+                  disabled={@is_streaming}
+                  aria-label="Message input"
+                ></textarea>
+                <.button type="submit" disabled={@is_streaming} class="btn btn-primary self-end px-6">
+                  <.icon name="hero-paper-airplane" class="w-4 h-4" /> Send
+                </.button>
+              </.form>
+            </div>
           </div>
-        </div>
+        <% else %>
+          <!-- Messages -->
+          <div
+            class="flex-1 overflow-y-auto p-4"
+            id="messages-container"
+            role="log"
+            aria-label="Chat messages"
+            aria-live="polite"
+            phx-hook="ScrollToBottom"
+          >
+            <div class="max-w-3xl mx-auto space-y-6">
+              <%= for message <- @messages do %>
+                <div class={[
+                  "flex gap-3",
+                  message.role == "user" && "flex-row-reverse"
+                ]}>
+                  <!-- Avatar -->
+                  <div class={[
+                    "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
+                    message.role == "user" && "bg-primary text-primary-content",
+                    message.role != "user" && "bg-secondary text-secondary-content"
+                  ]}>
+                    <%= if message.role == "user" do %>
+                      <.icon name="hero-user" class="w-4 h-4" />
+                    <% else %>
+                      <.icon name="hero-sparkles" class="w-4 h-4" />
+                    <% end %>
+                  </div>
+                  
+    <!-- Message Content -->
+                  <div class={[
+                    "flex-1 max-w-[80%]",
+                    message.role == "user" && "text-right"
+                  ]}>
+                    <div class={[
+                      "inline-block rounded-2xl px-4 py-2 text-left",
+                      message.role == "user" && "bg-primary text-primary-content",
+                      message.role != "user" && "bg-base-200"
+                    ]}>
+                      <div class="whitespace-pre-wrap">{message.content}</div>
+                    </div>
+                    <div class="text-xs text-base-content/40 mt-1 px-1">
+                      {format_timestamp(message.inserted_at)}
+                    </div>
+                  </div>
+                </div>
+              <% end %>
+              
+    <!-- Streaming Response -->
+              <%= if @is_streaming do %>
+                <div class="flex gap-3">
+                  <div class="w-8 h-8 rounded-full bg-secondary text-secondary-content flex items-center justify-center flex-shrink-0">
+                    <.icon name="hero-sparkles" class="w-4 h-4" />
+                  </div>
+                  <div class="flex-1 max-w-[80%]">
+                    <div class="inline-block rounded-2xl px-4 py-2 bg-base-200">
+                      <%= if @streaming_chunks != [] do %>
+                        <div class="whitespace-pre-wrap">
+                          {IO.iodata_to_binary(@streaming_chunks)}
+                        </div>
+                      <% end %>
+                      <span class="loading loading-dots loading-sm"></span>
+                    </div>
+                  </div>
+                </div>
+              <% end %>
+            </div>
+          </div>
+          
+    <!-- Input Form (Fixed at Bottom) -->
+          <div class="border-t border-base-300 bg-base-100 p-4">
+            <div class="max-w-3xl mx-auto">
+              <.form
+                for={@form}
+                phx-submit="send_message"
+                class="flex gap-3 items-end"
+                aria-label="Send message"
+              >
+                <textarea
+                  name="message[content]"
+                  placeholder="Type your message..."
+                  rows="1"
+                  class="textarea textarea-bordered flex-1 text-base resize-none min-h-[44px] max-h-[200px] focus:textarea-primary"
+                  disabled={@is_streaming}
+                  aria-label="Message input"
+                  phx-hook="AutoGrowTextarea"
+                  id="message-input"
+                ></textarea>
+                <.button
+                  type="submit"
+                  disabled={@is_streaming}
+                  class="btn btn-primary btn-square"
+                  aria-label="Send message"
+                >
+                  <%= if @is_streaming do %>
+                    <span class="loading loading-spinner loading-sm"></span>
+                  <% else %>
+                    <.icon name="hero-paper-airplane" class="w-5 h-5" />
+                  <% end %>
+                </.button>
+              </.form>
+            </div>
+          </div>
+        <% end %>
       </main>
     </div>
     """
+  end
+
+  defp format_model_name(nil), do: "Select model"
+
+  defp format_model_name(name) do
+    name
+    |> String.split("/")
+    |> List.last()
+    |> String.slice(0, 20)
+  end
+
+  defp format_timestamp(nil), do: ""
+
+  defp format_timestamp(datetime) do
+    Calendar.strftime(datetime, "%I:%M %p")
   end
 end
