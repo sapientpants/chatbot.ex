@@ -96,21 +96,25 @@ defmodule ChatbotWeb.CoreComponents do
 
   def button(%{rest: rest} = assigns) do
     variants = %{"primary" => "btn-primary", nil => "btn-primary btn-soft"}
+    variant_class = Map.fetch!(variants, assigns[:variant])
 
+    # Merge button classes with any passed classes, filtering out nils
     assigns =
-      assign_new(assigns, :class, fn ->
-        ["btn", Map.fetch!(variants, assigns[:variant])]
-      end)
+      assign(
+        assigns,
+        :btn_class,
+        ["btn", variant_class, assigns[:class]] |> Enum.reject(&is_nil/1)
+      )
 
     if rest[:href] || rest[:navigate] || rest[:patch] do
       ~H"""
-      <.link class={@class} {@rest}>
+      <.link class={@btn_class} {@rest}>
         {render_slot(@inner_block)}
       </.link>
       """
     else
       ~H"""
-      <button class={@class} {@rest}>
+      <button class={@btn_class} {@rest}>
         {render_slot(@inner_block)}
       </button>
       """
@@ -417,6 +421,54 @@ defmodule ChatbotWeb.CoreComponents do
   def icon(%{name: "hero-" <> _} = assigns) do
     ~H"""
     <span class={[@name, @class]} />
+    """
+  end
+
+  @doc """
+  Renders markdown content as HTML.
+
+  Uses Earmark to parse markdown and render it with appropriate styling.
+  Code blocks are syntax-highlighted when possible.
+
+  Note: This intentionally uses Phoenix.HTML.raw/1 to render HTML from Earmark.
+  The content comes from our AI backend responses, not directly from user input.
+
+  ## Examples
+
+      <.markdown content={@message.content} />
+  """
+  attr :content, :string, required: true
+  attr :class, :string, default: nil
+
+  # sobelow_skip ["XSS.Raw"]
+  def markdown(assigns) do
+    html =
+      case Earmark.as_html(assigns.content,
+             code_class_prefix: "language-",
+             smartypants: false
+           ) do
+        {:ok, html_string, _} -> Phoenix.HTML.raw(html_string)
+        {:error, _html, _errors} -> Phoenix.HTML.raw("<p>Error rendering markdown</p>")
+      end
+
+    assigns = assign(assigns, :html, html)
+
+    ~H"""
+    <div class={[
+      "prose prose-sm max-w-none dark:prose-invert",
+      "prose-p:my-3 prose-p:leading-relaxed",
+      "prose-pre:bg-base-300/80 prose-pre:text-base-content prose-pre:rounded-xl prose-pre:p-4 prose-pre:overflow-x-auto prose-pre:my-5 prose-pre:border prose-pre:border-base-content/10 prose-pre:shadow-sm",
+      "prose-code:bg-base-300 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:before:content-none prose-code:after:content-none",
+      "prose-ul:my-3 prose-ul:list-disc prose-ul:pl-5 prose-ol:my-3 prose-ol:list-decimal prose-ol:pl-5 prose-li:my-1.5 prose-li:marker:text-base-content/60",
+      "prose-headings:font-semibold prose-headings:text-base-content prose-h1:text-xl prose-h1:mt-6 prose-h1:mb-3 prose-h2:text-lg prose-h2:mt-5 prose-h2:mb-2 prose-h3:text-base prose-h3:mt-4 prose-h3:mb-2",
+      "prose-a:text-primary prose-a:no-underline hover:prose-a:underline",
+      "prose-blockquote:border-l-primary prose-blockquote:not-italic prose-blockquote:my-4 prose-blockquote:pl-4",
+      "prose-strong:font-semibold prose-strong:text-base-content",
+      "prose-hr:my-6",
+      @class
+    ]}>
+      {@html}
+    </div>
     """
   end
 

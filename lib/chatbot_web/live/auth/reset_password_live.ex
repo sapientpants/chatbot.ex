@@ -41,13 +41,13 @@ defmodule ChatbotWeb.ResetPasswordLive do
             autocomplete="new-password"
           />
 
-          <.button phx-disable-with="Resetting..." class="w-full">
+          <.button variant="primary" phx-disable-with="Resetting..." class="w-full">
             Reset password
           </.button>
         </.form>
 
         <div class="text-center mt-6">
-          <.link navigate={~p"/login"} class="text-sm text-blue-600 hover:underline">
+          <.link navigate={~p"/login"} class="text-sm text-primary hover:underline">
             Back to log in
           </.link>
         </div>

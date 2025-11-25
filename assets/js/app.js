@@ -25,9 +25,90 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/chatbot"
 import topbar from "../vendor/topbar"
 
+// Syntax highlighting for code blocks
+import hljs from "highlight.js/lib/core"
+import elixir from "highlight.js/lib/languages/elixir"
+import javascript from "highlight.js/lib/languages/javascript"
+import python from "highlight.js/lib/languages/python"
+import bash from "highlight.js/lib/languages/bash"
+import json from "highlight.js/lib/languages/json"
+import sql from "highlight.js/lib/languages/sql"
+import css from "highlight.js/lib/languages/css"
+import xml from "highlight.js/lib/languages/xml"
+
+// Register languages
+hljs.registerLanguage("elixir", elixir)
+hljs.registerLanguage("javascript", javascript)
+hljs.registerLanguage("js", javascript)
+hljs.registerLanguage("python", python)
+hljs.registerLanguage("bash", bash)
+hljs.registerLanguage("shell", bash)
+hljs.registerLanguage("json", json)
+hljs.registerLanguage("sql", sql)
+hljs.registerLanguage("css", css)
+hljs.registerLanguage("html", xml)
+hljs.registerLanguage("xml", xml)
+
+window.hljs = hljs
+
 // Custom hooks
 const Hooks = {
   ...colocatedHooks,
+
+  // Auto-grow textarea as user types and handle Enter/Shift+Enter
+  AutoGrowTextarea: {
+    MAX_HEIGHT: 200,
+    mounted() {
+      this.el.addEventListener("input", () => this.resize())
+      this.el.addEventListener("keydown", (e) => this.handleKeydown(e))
+      this.resize()
+      // Focus the textarea on mount
+      this.el.focus()
+    },
+    updated() {
+      // Reset height after form clears (don't auto-focus to avoid stealing focus)
+      this.resize()
+    },
+    resize() {
+      this.el.style.height = "auto"
+      this.el.style.height = Math.min(this.el.scrollHeight, this.MAX_HEIGHT) + "px"
+    },
+    handleKeydown(e) {
+      // Enter without Shift submits the form
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault()
+        const form = this.el.closest("form")
+        if (form && this.el.value.trim()) {
+          form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))
+        }
+      }
+      // Shift+Enter adds a newline (default behavior, no need to handle)
+    }
+  },
+
+  // Scroll to bottom when new messages arrive and highlight code
+  // Uses flex-col-reverse so scrollTop=0 shows the bottom (no flicker on load)
+  ScrollToBottom: {
+    mounted() {
+      this.highlightCode()
+    },
+    updated() {
+      this.highlightCode()
+      this.scrollToBottom()
+    },
+    scrollToBottom() {
+      // With flex-col-reverse, scrollTop=0 is the bottom
+      this.el.scrollTop = 0
+    },
+    highlightCode() {
+      // Highlight all code blocks that haven't been highlighted yet
+      if (window.hljs) {
+        this.el.querySelectorAll("pre code:not(.hljs)").forEach((block) => {
+          window.hljs.highlightElement(block)
+        })
+      }
+    }
+  }
 }
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
@@ -52,7 +133,7 @@ window.addEventListener("phx:download", (event) => {
 })
 
 // Show progress bar on live navigation and form submits
-topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
+topbar.config({barColors: {0: "#f97316"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 

@@ -22,13 +22,13 @@ defmodule ChatbotWeb.ForgotPasswordLive do
         <.form for={@form} id="forgot_password_form" phx-submit="send_reset_link" class="space-y-4">
           <.input field={@form[:email]} type="email" label="Email" required />
 
-          <.button phx-disable-with="Sending..." class="w-full">
+          <.button variant="primary" phx-disable-with="Sending..." class="w-full">
             Send reset link
           </.button>
         </.form>
 
         <div class="text-center mt-6">
-          <.link navigate={~p"/login"} class="text-sm text-blue-600 hover:underline">
+          <.link navigate={~p"/login"} class="text-sm text-primary hover:underline">
             Back to log in
           </.link>
         </div>
