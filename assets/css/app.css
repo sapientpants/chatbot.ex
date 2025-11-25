@@ -103,3 +103,279 @@
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
 /* This file is for your main application CSS */
+
+/* Prose list styles - ensure bullets/numbers are visible */
+.prose ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+}
+
+.prose ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+}
+
+.prose li {
+  margin-top: 0.375rem;
+  margin-bottom: 0.375rem;
+}
+
+.prose li::marker {
+  color: oklch(55% 0 0);
+}
+
+[data-theme="dark"] .prose li::marker {
+  color: oklch(70% 0 0);
+}
+
+/* Prose heading styles - ensure proper visual hierarchy */
+.prose h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.prose h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.prose h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Syntax highlighting for code blocks - Light theme (GitHub style) */
+.hljs {
+  background: transparent;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #6a737d;
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-subst {
+  color: #d73a49;
+  font-weight: 500;
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag .hljs-attr {
+  color: #005cc5;
+}
+
+.hljs-string,
+.hljs-doctag {
+  color: #032f62;
+}
+
+.hljs-title,
+.hljs-section,
+.hljs-selector-id {
+  color: #6f42c1;
+  font-weight: 500;
+}
+
+.hljs-type,
+.hljs-class .hljs-title {
+  color: #6f42c1;
+}
+
+.hljs-tag,
+.hljs-name,
+.hljs-attribute {
+  color: #22863a;
+}
+
+.hljs-regexp,
+.hljs-link {
+  color: #032f62;
+}
+
+.hljs-symbol,
+.hljs-bullet {
+  color: #e36209;
+}
+
+.hljs-built_in,
+.hljs-builtin-name {
+  color: #005cc5;
+}
+
+.hljs-meta {
+  color: #735c0f;
+}
+
+.hljs-deletion {
+  color: #b31d28;
+  background-color: #ffeef0;
+}
+
+.hljs-addition {
+  color: #22863a;
+  background-color: #f0fff4;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: bold;
+}
+
+/* Dark theme overrides */
+[data-theme="dark"] .hljs-comment,
+[data-theme="dark"] .hljs-quote {
+  color: #8b949e;
+}
+
+[data-theme="dark"] .hljs-keyword,
+[data-theme="dark"] .hljs-selector-tag,
+[data-theme="dark"] .hljs-subst {
+  color: #ff7b72;
+}
+
+[data-theme="dark"] .hljs-number,
+[data-theme="dark"] .hljs-literal,
+[data-theme="dark"] .hljs-variable,
+[data-theme="dark"] .hljs-template-variable,
+[data-theme="dark"] .hljs-tag .hljs-attr {
+  color: #79c0ff;
+}
+
+[data-theme="dark"] .hljs-string,
+[data-theme="dark"] .hljs-doctag {
+  color: #a5d6ff;
+}
+
+[data-theme="dark"] .hljs-title,
+[data-theme="dark"] .hljs-section,
+[data-theme="dark"] .hljs-selector-id {
+  color: #d2a8ff;
+}
+
+[data-theme="dark"] .hljs-type,
+[data-theme="dark"] .hljs-class .hljs-title {
+  color: #d2a8ff;
+}
+
+[data-theme="dark"] .hljs-tag,
+[data-theme="dark"] .hljs-name,
+[data-theme="dark"] .hljs-attribute {
+  color: #7ee787;
+}
+
+[data-theme="dark"] .hljs-regexp,
+[data-theme="dark"] .hljs-link {
+  color: #a5d6ff;
+}
+
+[data-theme="dark"] .hljs-symbol,
+[data-theme="dark"] .hljs-bullet {
+  color: #ffa657;
+}
+
+[data-theme="dark"] .hljs-built_in,
+[data-theme="dark"] .hljs-builtin-name {
+  color: #79c0ff;
+}
+
+[data-theme="dark"] .hljs-meta {
+  color: #e3b341;
+}
+
+[data-theme="dark"] .hljs-deletion {
+  color: #ffdcd7;
+  background-color: #67060c;
+}
+
+[data-theme="dark"] .hljs-addition {
+  color: #aff5b4;
+  background-color: #033a16;
+}
+
+/* System dark mode (when no explicit theme is set) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .hljs-comment,
+  :root:not([data-theme]) .hljs-quote {
+    color: #8b949e;
+  }
+
+  :root:not([data-theme]) .hljs-keyword,
+  :root:not([data-theme]) .hljs-selector-tag,
+  :root:not([data-theme]) .hljs-subst {
+    color: #ff7b72;
+  }
+
+  :root:not([data-theme]) .hljs-number,
+  :root:not([data-theme]) .hljs-literal,
+  :root:not([data-theme]) .hljs-variable,
+  :root:not([data-theme]) .hljs-template-variable,
+  :root:not([data-theme]) .hljs-tag .hljs-attr {
+    color: #79c0ff;
+  }
+
+  :root:not([data-theme]) .hljs-string,
+  :root:not([data-theme]) .hljs-doctag {
+    color: #a5d6ff;
+  }
+
+  :root:not([data-theme]) .hljs-title,
+  :root:not([data-theme]) .hljs-section,
+  :root:not([data-theme]) .hljs-selector-id {
+    color: #d2a8ff;
+  }
+
+  :root:not([data-theme]) .hljs-type,
+  :root:not([data-theme]) .hljs-class .hljs-title {
+    color: #d2a8ff;
+  }
+
+  :root:not([data-theme]) .hljs-tag,
+  :root:not([data-theme]) .hljs-name,
+  :root:not([data-theme]) .hljs-attribute {
+    color: #7ee787;
+  }
+
+  :root:not([data-theme]) .hljs-regexp,
+  :root:not([data-theme]) .hljs-link {
+    color: #a5d6ff;
+  }
+
+  :root:not([data-theme]) .hljs-symbol,
+  :root:not([data-theme]) .hljs-bullet {
+    color: #ffa657;
+  }
+
+  :root:not([data-theme]) .hljs-built_in,
+  :root:not([data-theme]) .hljs-builtin-name {
+    color: #79c0ff;
+  }
+
+  :root:not([data-theme]) .hljs-meta {
+    color: #e3b341;
+  }
+
+  :root:not([data-theme]) .hljs-deletion {
+    color: #ffdcd7;
+    background-color: #67060c;
+  }
+
+  :root:not([data-theme]) .hljs-addition {
+    color: #aff5b4;
+    background-color: #033a16;
+  }
+}

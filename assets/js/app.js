@@ -25,6 +25,32 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/chatbot"
 import topbar from "../vendor/topbar"
 
+// Syntax highlighting for code blocks
+import hljs from "highlight.js/lib/core"
+import elixir from "highlight.js/lib/languages/elixir"
+import javascript from "highlight.js/lib/languages/javascript"
+import python from "highlight.js/lib/languages/python"
+import bash from "highlight.js/lib/languages/bash"
+import json from "highlight.js/lib/languages/json"
+import sql from "highlight.js/lib/languages/sql"
+import css from "highlight.js/lib/languages/css"
+import xml from "highlight.js/lib/languages/xml"
+
+// Register languages
+hljs.registerLanguage("elixir", elixir)
+hljs.registerLanguage("javascript", javascript)
+hljs.registerLanguage("js", javascript)
+hljs.registerLanguage("python", python)
+hljs.registerLanguage("bash", bash)
+hljs.registerLanguage("shell", bash)
+hljs.registerLanguage("json", json)
+hljs.registerLanguage("sql", sql)
+hljs.registerLanguage("css", css)
+hljs.registerLanguage("html", xml)
+hljs.registerLanguage("xml", xml)
+
+window.hljs = hljs
+
 // Custom hooks
 const Hooks = {
   ...colocatedHooks,
@@ -53,16 +79,27 @@ const Hooks = {
     }
   },
 
-  // Scroll to bottom when new messages arrive
+  // Scroll to bottom when new messages arrive and highlight code
+  // Uses flex-col-reverse so scrollTop=0 shows the bottom (no flicker on load)
   ScrollToBottom: {
     mounted() {
-      this.scrollToBottom()
+      this.highlightCode()
     },
     updated() {
+      this.highlightCode()
       this.scrollToBottom()
     },
     scrollToBottom() {
-      this.el.scrollTop = this.el.scrollHeight
+      // With flex-col-reverse, scrollTop=0 is the bottom
+      this.el.scrollTop = 0
+    },
+    highlightCode() {
+      // Highlight all code blocks that haven't been highlighted yet
+      if (window.hljs) {
+        this.el.querySelectorAll("pre code:not(.hljs)").forEach((block) => {
+          window.hljs.highlightElement(block)
+        })
+      }
     }
   }
 }

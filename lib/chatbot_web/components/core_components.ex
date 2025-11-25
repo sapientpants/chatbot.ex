@@ -451,13 +451,15 @@ defmodule ChatbotWeb.CoreComponents do
     ~H"""
     <div class={[
       "prose prose-sm max-w-none dark:prose-invert",
-      "prose-p:my-2 prose-p:leading-relaxed",
-      "prose-pre:bg-base-300 prose-pre:text-base-content prose-pre:rounded-lg prose-pre:p-3 prose-pre:overflow-x-auto",
+      "prose-p:my-3 prose-p:leading-relaxed",
+      "prose-pre:bg-base-300/80 prose-pre:text-base-content prose-pre:rounded-xl prose-pre:p-4 prose-pre:overflow-x-auto prose-pre:my-5 prose-pre:border prose-pre:border-base-content/10 prose-pre:shadow-sm",
       "prose-code:bg-base-300 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:before:content-none prose-code:after:content-none",
-      "prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5",
-      "prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-sm",
+      "prose-ul:my-3 prose-ul:list-disc prose-ul:pl-5 prose-ol:my-3 prose-ol:list-decimal prose-ol:pl-5 prose-li:my-1.5 prose-li:marker:text-base-content/60",
+      "prose-headings:font-semibold prose-headings:text-base-content prose-h1:text-xl prose-h1:mt-6 prose-h1:mb-3 prose-h2:text-lg prose-h2:mt-5 prose-h2:mb-2 prose-h3:text-base prose-h3:mt-4 prose-h3:mb-2",
       "prose-a:text-primary prose-a:no-underline hover:prose-a:underline",
-      "prose-blockquote:border-l-primary prose-blockquote:not-italic",
+      "prose-blockquote:border-l-primary prose-blockquote:not-italic prose-blockquote:my-4 prose-blockquote:pl-4",
+      "prose-strong:font-semibold prose-strong:text-base-content",
+      "prose-hr:my-6",
       @class
     ]}>
       {@html}

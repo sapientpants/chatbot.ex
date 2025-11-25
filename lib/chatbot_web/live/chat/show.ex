@@ -405,7 +405,7 @@ defmodule ChatbotWeb.ChatLive.Show do
         
     <!-- Messages Area -->
         <div
-          class="flex-1 overflow-y-auto"
+          class="flex-1 overflow-y-auto flex flex-col-reverse"
           id="messages-container"
           role="log"
           aria-label="Chat messages"
@@ -440,7 +440,8 @@ defmodule ChatbotWeb.ChatLive.Show do
                   <div class={[
                     "inline-block rounded-2xl px-4 py-3 max-w-[85%]",
                     message.role == "user" && "bg-primary text-primary-content rounded-br-md",
-                    message.role != "user" && "bg-base-200 rounded-bl-md"
+                    message.role != "user" &&
+                      "bg-base-200 rounded-bl-md border border-base-300 shadow-sm"
                   ]}>
                     <.markdown content={message.content} />
                   </div>
@@ -458,7 +459,7 @@ defmodule ChatbotWeb.ChatLive.Show do
                   <.icon name="hero-sparkles" class="w-4 h-4" />
                 </div>
                 <div class="flex-1 min-w-0">
-                  <div class="inline-block rounded-2xl rounded-bl-md px-4 py-3 bg-base-200 max-w-[85%]">
+                  <div class="inline-block rounded-2xl rounded-bl-md px-4 py-3 bg-base-200 border border-base-300 shadow-sm max-w-[85%]">
                     <%= if @streaming_chunks != [] do %>
                       <.markdown content={IO.iodata_to_binary(@streaming_chunks)} />
                     <% end %>
