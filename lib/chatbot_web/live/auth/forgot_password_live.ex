@@ -7,6 +7,7 @@ defmodule ChatbotWeb.ForgotPasswordLive do
   use ChatbotWeb, :live_view
 
   alias Chatbot.Accounts
+  alias ChatbotWeb.Plugs.RateLimiter
 
   def render(assigns) do
     ~H"""
@@ -42,19 +43,28 @@ defmodule ChatbotWeb.ForgotPasswordLive do
   end
 
   def handle_event("send_reset_link", %{"user" => %{"email" => email}}, socket) do
-    if user = Accounts.get_user_by_email(email) do
-      Accounts.deliver_user_reset_password_instructions(
-        user,
-        &url(~p"/reset-password/#{&1}")
-      )
+    case RateLimiter.check_password_reset_rate_limit(email) do
+      :ok ->
+        if user = Accounts.get_user_by_email(email) do
+          Accounts.deliver_user_reset_password_instructions(
+            user,
+            &url(~p"/reset-password/#{&1}")
+          )
+        end
+
+        info =
+          "If your email is in our system, you will receive instructions to reset your password shortly. Please check your console for the reset link (email not configured)."
+
+        {:noreply,
+         socket
+         |> put_flash(:info, info)
+         |> redirect(to: ~p"/login")}
+
+      {:error, message} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, message)
+         |> redirect(to: ~p"/login")}
     end
-
-    info =
-      "If your email is in our system, you will receive instructions to reset your password shortly. Please check your console for the reset link (email not configured)."
-
-    {:noreply,
-     socket
-     |> put_flash(:info, info)
-     |> redirect(to: ~p"/login")}
   end
 end

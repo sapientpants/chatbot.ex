@@ -172,6 +172,22 @@ defmodule Chatbot.Chat do
   end
 
   @doc """
+  Returns the list of messages for a conversation.
+
+  ## Examples
+
+      iex> list_messages(conversation_id)
+      [%Message{}, ...]
+
+  """
+  def list_messages(conversation_id) do
+    Message
+    |> where([m], m.conversation_id == ^conversation_id)
+    |> order_by([m], asc: m.inserted_at)
+    |> Repo.all()
+  end
+
+  @doc """
   Creates a message.
 
   ## Examples

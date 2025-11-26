@@ -442,13 +442,19 @@ defmodule ChatbotWeb.CoreComponents do
 
   # sobelow_skip ["XSS.Raw"]
   def markdown(assigns) do
+    # Content is sanitized with HtmlSanitizeEx before rendering as raw HTML
     html =
       case Earmark.as_html(assigns.content,
              code_class_prefix: "language-",
              smartypants: false
            ) do
-        {:ok, html_string, _} -> Phoenix.HTML.raw(html_string)
-        {:error, _html, _errors} -> Phoenix.HTML.raw("<p>Error rendering markdown</p>")
+        {:ok, html_string, _} ->
+          html_string
+          |> HtmlSanitizeEx.markdown_html()
+          |> Phoenix.HTML.raw()
+
+        {:error, _html, _errors} ->
+          Phoenix.HTML.raw("<p>Error rendering markdown</p>")
       end
 
     assigns = assign(assigns, :html, html)

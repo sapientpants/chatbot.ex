@@ -25,31 +25,54 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/chatbot"
 import topbar from "../vendor/topbar"
 
-// Syntax highlighting for code blocks
-import hljs from "highlight.js/lib/core"
-import elixir from "highlight.js/lib/languages/elixir"
-import javascript from "highlight.js/lib/languages/javascript"
-import python from "highlight.js/lib/languages/python"
-import bash from "highlight.js/lib/languages/bash"
-import json from "highlight.js/lib/languages/json"
-import sql from "highlight.js/lib/languages/sql"
-import css from "highlight.js/lib/languages/css"
-import xml from "highlight.js/lib/languages/xml"
+// Lazy-load highlight.js for code blocks (reduces initial bundle size)
+let hljsPromise = null
 
-// Register languages
-hljs.registerLanguage("elixir", elixir)
-hljs.registerLanguage("javascript", javascript)
-hljs.registerLanguage("js", javascript)
-hljs.registerLanguage("python", python)
-hljs.registerLanguage("bash", bash)
-hljs.registerLanguage("shell", bash)
-hljs.registerLanguage("json", json)
-hljs.registerLanguage("sql", sql)
-hljs.registerLanguage("css", css)
-hljs.registerLanguage("html", xml)
-hljs.registerLanguage("xml", xml)
+async function loadHighlightJs() {
+  if (hljsPromise) return hljsPromise
 
-window.hljs = hljs
+  hljsPromise = (async () => {
+    const [
+      {default: hljs},
+      {default: elixir},
+      {default: javascript},
+      {default: python},
+      {default: bash},
+      {default: json},
+      {default: sql},
+      {default: css},
+      {default: xml}
+    ] = await Promise.all([
+      import("highlight.js/lib/core"),
+      import("highlight.js/lib/languages/elixir"),
+      import("highlight.js/lib/languages/javascript"),
+      import("highlight.js/lib/languages/python"),
+      import("highlight.js/lib/languages/bash"),
+      import("highlight.js/lib/languages/json"),
+      import("highlight.js/lib/languages/sql"),
+      import("highlight.js/lib/languages/css"),
+      import("highlight.js/lib/languages/xml")
+    ])
+
+    // Register languages
+    hljs.registerLanguage("elixir", elixir)
+    hljs.registerLanguage("javascript", javascript)
+    hljs.registerLanguage("js", javascript)
+    hljs.registerLanguage("python", python)
+    hljs.registerLanguage("bash", bash)
+    hljs.registerLanguage("shell", bash)
+    hljs.registerLanguage("json", json)
+    hljs.registerLanguage("sql", sql)
+    hljs.registerLanguage("css", css)
+    hljs.registerLanguage("html", xml)
+    hljs.registerLanguage("xml", xml)
+
+    window.hljs = hljs
+    return hljs
+  })()
+
+  return hljsPromise
+}
 
 // Custom hooks
 const Hooks = {
@@ -100,13 +123,16 @@ const Hooks = {
       // With flex-col-reverse, scrollTop=0 is the bottom
       this.el.scrollTop = 0
     },
-    highlightCode() {
-      // Highlight all code blocks that haven't been highlighted yet
-      if (window.hljs) {
-        this.el.querySelectorAll("pre code:not(.hljs)").forEach((block) => {
-          window.hljs.highlightElement(block)
-        })
-      }
+    async highlightCode() {
+      // Only load highlight.js if there are code blocks to highlight
+      const unhighlightedBlocks = this.el.querySelectorAll("pre code:not(.hljs)")
+      if (unhighlightedBlocks.length === 0) return
+
+      // Lazy-load highlight.js on first use
+      const hljs = await loadHighlightJs()
+      unhighlightedBlocks.forEach((block) => {
+        hljs.highlightElement(block)
+      })
     }
   }
 }

@@ -14,6 +14,8 @@ defmodule Chatbot.Application do
       {Phoenix.PubSub, name: Chatbot.PubSub},
       # Rate limiting backend
       {Hammer.Backend.ETS, [expiry_ms: 60_000 * 60 * 4, cleanup_interval_ms: 60_000 * 10]},
+      # Model list cache
+      Chatbot.ModelCache,
       # Task supervisor for background tasks
       {Task.Supervisor, name: Chatbot.TaskSupervisor},
       # Start to serve requests, typically the last entry

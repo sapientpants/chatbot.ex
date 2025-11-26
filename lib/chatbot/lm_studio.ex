@@ -1,12 +1,75 @@
 defmodule Chatbot.LMStudio do
   @moduledoc """
   Client for interacting with LM Studio's OpenAI-compatible API.
+
+  Configuration is loaded from application config under `:chatbot, :lm_studio`.
+  Includes circuit breaker protection using Fuse to prevent cascading failures.
   """
 
-  @base_url Application.compile_env(:chatbot, :lm_studio_url, "http://localhost:1234/v1")
+  @behaviour Chatbot.LMStudioBehaviour
+
+  require Logger
+
+  @typedoc "A chat message in OpenAI format"
+  @type message :: %{role: String.t(), content: String.t()}
+
+  @typedoc "A list of chat messages"
+  @type messages :: [message()]
+
+  @typedoc "Model information from LM Studio"
+  @type model_info :: %{String.t() => any()}
+
+  @fuse_name :lm_studio_fuse
+  @fuse_options {{:standard, 5, 60_000}, {:reset, 30_000}}
+
+  defp base_url do
+    config()[:base_url] || "http://localhost:1234/v1"
+  end
+
+  defp stream_timeout do
+    config()[:stream_timeout_ms] || 300_000
+  end
+
+  defp config do
+    Application.get_env(:chatbot, :lm_studio, [])
+  end
+
+  defp ensure_fuse_installed do
+    case :fuse.ask(@fuse_name, :sync) do
+      :ok ->
+        :ok
+
+      :blown ->
+        :blown
+
+      {:error, :not_found} ->
+        :fuse.install(@fuse_name, @fuse_options)
+        :ok
+    end
+  end
+
+  defp with_circuit_breaker(fun) do
+    case ensure_fuse_installed() do
+      :blown ->
+        {:error, "LM Studio service is temporarily unavailable. Please try again later."}
+
+      :ok ->
+        result = fun.()
+
+        case result do
+          {:error, _} ->
+            :fuse.melt(@fuse_name)
+            result
+
+          _ ->
+            result
+        end
+    end
+  end
 
   @doc """
   Fetches the list of available models from LM Studio.
+  Protected by circuit breaker to prevent cascading failures.
 
   ## Examples
 
@@ -17,21 +80,25 @@ defmodule Chatbot.LMStudio do
       {:error, "Connection refused"}
 
   """
+  @spec list_models() :: {:ok, [model_info()]} | {:error, String.t()}
   def list_models do
-    case Req.get("#{@base_url}/models") do
-      {:ok, %{status: 200, body: %{"data" => models}}} ->
-        {:ok, models}
+    with_circuit_breaker(fn ->
+      case Req.get("#{base_url()}/models", retry: false) do
+        {:ok, %{status: 200, body: %{"data" => models}}} ->
+          {:ok, models}
 
-      {:ok, %{status: status}} ->
-        {:error, "Unexpected status: #{status}"}
+        {:ok, %{status: status}} ->
+          {:error, "Unexpected status: #{status}"}
 
-      {:error, exception} ->
-        {:error, Exception.message(exception)}
-    end
+        {:error, exception} ->
+          {:error, Exception.message(exception)}
+      end
+    end)
   end
 
   @doc """
   Sends a chat completion request with streaming enabled.
+  Protected by circuit breaker to prevent cascading failures.
 
   ## Parameters
     - messages: List of messages in OpenAI format [%{role: "user", content: "..."}]
@@ -44,7 +111,21 @@ defmodule Chatbot.LMStudio do
       :ok
 
   """
+  @spec stream_chat_completion(messages(), String.t(), pid()) :: :ok | {:error, String.t()}
   def stream_chat_completion(messages, model, pid) do
+    # Check circuit breaker first
+    case ensure_fuse_installed() do
+      :blown ->
+        error_msg = "LM Studio service is temporarily unavailable. Please try again later."
+        send(pid, {:error, error_msg})
+        {:error, error_msg}
+
+      :ok ->
+        do_stream_chat_completion(messages, model, pid)
+    end
+  end
+
+  defp do_stream_chat_completion(messages, model, pid) do
     body = %{
       model: model,
       messages: messages,
@@ -87,15 +168,18 @@ defmodule Chatbot.LMStudio do
     end
 
     try do
-      Req.post!("#{@base_url}/chat/completions",
+      Req.post!("#{base_url()}/chat/completions",
         json: body,
-        receive_timeout: 300_000,
-        finch_request: finch_stream
+        receive_timeout: stream_timeout(),
+        finch_request: finch_stream,
+        retry: false
       )
 
       :ok
     rescue
       e ->
+        # Record failure in circuit breaker
+        :fuse.melt(@fuse_name)
         send(pid, {:error, Exception.message(e)})
         {:error, Exception.message(e)}
     end
@@ -121,6 +205,7 @@ defmodule Chatbot.LMStudio do
 
   @doc """
   Sends a non-streaming chat completion request.
+  Protected by circuit breaker to prevent cascading failures.
 
   ## Parameters
     - messages: List of messages in OpenAI format
@@ -132,22 +217,25 @@ defmodule Chatbot.LMStudio do
       {:ok, %{"choices" => [%{"message" => %{"content" => "Hi there!"}}]}}
 
   """
+  @spec chat_completion(messages(), String.t()) :: {:ok, map()} | {:error, String.t()}
   def chat_completion(messages, model) do
-    body = %{
-      model: model,
-      messages: messages,
-      temperature: 0.7
-    }
+    with_circuit_breaker(fn ->
+      body = %{
+        model: model,
+        messages: messages,
+        temperature: 0.7
+      }
 
-    case Req.post("#{@base_url}/chat/completions", json: body) do
-      {:ok, %{status: 200, body: response}} ->
-        {:ok, response}
+      case Req.post("#{base_url()}/chat/completions", json: body, retry: false) do
+        {:ok, %{status: 200, body: response}} ->
+          {:ok, response}
 
-      {:ok, %{status: status, body: body}} ->
-        {:error, "Status #{status}: #{inspect(body)}"}
+        {:ok, %{status: status, body: body}} ->
+          {:error, "Status #{status}: #{inspect(body)}"}
 
-      {:error, exception} ->
-        {:error, Exception.message(exception)}
-    end
+        {:error, exception} ->
+          {:error, Exception.message(exception)}
+      end
+    end)
   end
 end
