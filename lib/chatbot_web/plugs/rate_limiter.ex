@@ -12,11 +12,13 @@ defmodule ChatbotWeb.Plugs.RateLimiter do
   @doc """
   Plug callback for initialization.
   """
+  @spec init(keyword()) :: keyword()
   def init(opts), do: opts
 
   @doc """
   Plug callback that routes to the appropriate rate limiter based on action.
   """
+  @spec call(Plug.Conn.t(), atom()) :: Plug.Conn.t()
   def call(conn, action) when is_atom(action) do
     apply(__MODULE__, action, [conn, []])
   end
@@ -25,6 +27,7 @@ defmodule ChatbotWeb.Plugs.RateLimiter do
   Rate limits login attempts per IP address.
   Configured via `:chatbot, :rate_limits, :login`.
   """
+  @spec rate_limit_login(Plug.Conn.t(), keyword()) :: Plug.Conn.t()
   def rate_limit_login(conn, _opts) do
     key = "login:#{get_ip(conn)}"
     config = get_rate_limit_config(:login)
@@ -45,6 +48,7 @@ defmodule ChatbotWeb.Plugs.RateLimiter do
   Rate limits registration attempts per IP address.
   Configured via `:chatbot, :rate_limits, :registration`.
   """
+  @spec rate_limit_registration(Plug.Conn.t(), keyword()) :: Plug.Conn.t()
   def rate_limit_registration(conn, _opts) do
     key = "registration:#{get_ip(conn)}"
     config = get_rate_limit_config(:registration)

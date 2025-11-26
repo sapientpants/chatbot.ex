@@ -8,6 +8,7 @@ defmodule ChatbotWeb.ResetPasswordLive do
 
   alias Chatbot.Accounts
 
+  @spec render(map()) :: Phoenix.LiveView.Rendered.t()
   def render(assigns) do
     ~H"""
     <div class="min-h-screen bg-base-200">
@@ -56,6 +57,8 @@ defmodule ChatbotWeb.ResetPasswordLive do
     """
   end
 
+  @spec mount(map(), map(), Phoenix.LiveView.Socket.t()) ::
+          {:ok, Phoenix.LiveView.Socket.t(), keyword()}
   def mount(%{"token" => token}, _session, socket) do
     socket =
       case Accounts.get_user_by_reset_password_token(token) do
@@ -78,6 +81,8 @@ defmodule ChatbotWeb.ResetPasswordLive do
     {:ok, socket, temporary_assigns: [form: nil]}
   end
 
+  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_event("validate", %{"user" => user_params}, socket) do
     changeset = Accounts.change_user_password(socket.assigns.user, user_params)
     {:noreply, assign_form(socket, Map.put(changeset, :action, :validate))}
@@ -85,7 +90,7 @@ defmodule ChatbotWeb.ResetPasswordLive do
 
   def handle_event("reset_password", %{"user" => user_params}, socket) do
     case Accounts.reset_user_password(socket.assigns.user, user_params) do
-      {:ok, _} ->
+      {:ok, _user} ->
         {:noreply,
          socket
          |> put_flash(:info, "Password reset successfully.")

@@ -151,9 +151,9 @@ defmodule Chatbot.LMStudioTest do
       messages = [%{role: "user", content: "Hello"}]
       model = "test-model"
 
-      assert {:error, _} = LMStudio.stream_chat_completion(messages, model, self())
+      assert {:error, _reason} = LMStudio.stream_chat_completion(messages, model, self())
 
-      assert_receive {:error, _message}, 1000
+      assert_receive {:error, _error_message}, 1000
     end
   end
 
@@ -166,7 +166,7 @@ defmodule Chatbot.LMStudioTest do
       model = "test-model"
 
       # Trigger multiple failures to blow the fuse
-      for _ <- 1..6 do
+      for _i <- 1..6 do
         LMStudio.list_models()
       end
 
@@ -195,7 +195,7 @@ defmodule Chatbot.LMStudioTest do
       {:chunk, content} ->
         collect_stream_messages([{:chunk, content} | acc])
 
-      {:done, _} ->
+      {:done, _metadata} ->
         [{:done, ""} | acc]
 
       {:error, msg} ->

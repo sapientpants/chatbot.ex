@@ -7,11 +7,12 @@ defmodule ChatbotWeb.ChatLive.Index do
   """
   use ChatbotWeb, :live_view
 
-  alias Chatbot.Chat
-  alias ChatbotWeb.Live.Chat.StreamingHelpers
   import ChatbotWeb.Live.Chat.ChatComponents
 
-  @impl true
+  alias Chatbot.Chat
+  alias ChatbotWeb.Live.Chat.StreamingHelpers
+
+  @impl Phoenix.LiveView
   def mount(_params, _session, socket) do
     user_id = socket.assigns.current_user.id
     conversations = Chat.list_conversations(user_id)
@@ -19,7 +20,7 @@ defmodule ChatbotWeb.ChatLive.Index do
     # Use the most recent conversation or create a new one if none exist
     conversation =
       case conversations do
-        [most_recent | _] ->
+        [most_recent | _rest] ->
           most_recent
 
         [] ->
@@ -68,19 +69,19 @@ defmodule ChatbotWeb.ChatLive.Index do
     {:ok, socket}
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def handle_info(:load_models, socket) do
     socket = assign(socket, :models_loading, false)
     StreamingHelpers.handle_load_models(socket)
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def handle_info({:chunk, content}, socket) do
     StreamingHelpers.handle_chunk(content, socket)
   end
 
-  @impl true
-  def handle_info({:done, _}, socket) do
+  @impl Phoenix.LiveView
+  def handle_info({:done, _metadata}, socket) do
     conversation_id = socket.assigns.current_conversation.id
     user_id = socket.assigns.current_user.id
 
@@ -88,28 +89,28 @@ defmodule ChatbotWeb.ChatLive.Index do
     StreamingHelpers.handle_done(conversation_id, user_id, socket)
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def handle_info({:error, error_msg}, socket) do
     StreamingHelpers.handle_streaming_error(error_msg, socket)
   end
 
-  @impl true
-  def handle_info({:DOWN, _ref, :process, _pid, reason}, socket) do
+  @impl Phoenix.LiveView
+  def handle_info({:DOWN, _ref, :process, _task_pid, reason}, socket) do
     StreamingHelpers.handle_task_down(reason, socket)
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def handle_event("send_message", %{"message" => %{"content" => content}}, socket) do
     StreamingHelpers.send_message_with_streaming(content, socket)
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def handle_event("select_model", %{"model" => model_id}, socket) do
     StreamingHelpers.handle_select_model(model_id, socket)
   end
 
-  @impl true
-  def handle_event("new_conversation", _, socket) do
+  @impl Phoenix.LiveView
+  def handle_event("new_conversation", _params, socket) do
     user_id = socket.assigns.current_user.id
 
     case Chat.create_conversation(%{
@@ -134,12 +135,12 @@ defmodule ChatbotWeb.ChatLive.Index do
     end
   end
 
-  @impl true
-  def handle_event("toggle_sidebar", _, socket) do
+  @impl Phoenix.LiveView
+  def handle_event("toggle_sidebar", _params, socket) do
     {:noreply, assign(socket, :sidebar_open, !socket.assigns.sidebar_open)}
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def render(assigns) do
     ~H"""
     <div class="flex h-screen bg-base-100 relative">

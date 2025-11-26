@@ -7,11 +7,12 @@ defmodule ChatbotWeb.ChatLive.Show do
   """
   use ChatbotWeb, :live_view
 
-  alias Chatbot.Chat
-  alias ChatbotWeb.Live.Chat.StreamingHelpers
   import ChatbotWeb.Live.Chat.ChatComponents
 
-  @impl true
+  alias Chatbot.Chat
+  alias ChatbotWeb.Live.Chat.StreamingHelpers
+
+  @impl Phoenix.LiveView
   def mount(%{"id" => id}, _session, socket) do
     user_id = socket.assigns.current_user.id
 
@@ -54,19 +55,19 @@ defmodule ChatbotWeb.ChatLive.Show do
     end
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def handle_info(:load_models, socket) do
     socket = assign(socket, :models_loading, false)
     StreamingHelpers.handle_load_models(socket)
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def handle_info({:chunk, content}, socket) do
     StreamingHelpers.handle_chunk(content, socket)
   end
 
-  @impl true
-  def handle_info({:done, _}, socket) do
+  @impl Phoenix.LiveView
+  def handle_info({:done, _metadata}, socket) do
     conversation_id = socket.assigns.current_conversation.id
     user_id = socket.assigns.current_user.id
 
@@ -74,53 +75,53 @@ defmodule ChatbotWeb.ChatLive.Show do
     StreamingHelpers.handle_done(conversation_id, user_id, socket)
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def handle_info({:error, error_msg}, socket) do
     StreamingHelpers.handle_streaming_error(error_msg, socket)
   end
 
-  @impl true
-  def handle_info({:DOWN, _ref, :process, _pid, reason}, socket) do
+  @impl Phoenix.LiveView
+  def handle_info({:DOWN, _ref, :process, _task_pid, reason}, socket) do
     StreamingHelpers.handle_task_down(reason, socket)
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def handle_event("send_message", %{"message" => %{"content" => content}}, socket) do
     StreamingHelpers.send_message_with_streaming(content, socket)
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def handle_event("select_model", %{"model" => model_id}, socket) do
     StreamingHelpers.handle_select_model(model_id, socket)
   end
 
-  @impl true
-  def handle_event("new_conversation", _, socket) do
+  @impl Phoenix.LiveView
+  def handle_event("new_conversation", _params, socket) do
     StreamingHelpers.handle_new_conversation(socket, ~p"/chat")
   end
 
-  @impl true
-  def handle_event("show_delete_modal", _, socket) do
+  @impl Phoenix.LiveView
+  def handle_event("show_delete_modal", _params, socket) do
     {:noreply, assign(socket, :show_delete_modal, true)}
   end
 
-  @impl true
-  def handle_event("hide_delete_modal", _, socket) do
+  @impl Phoenix.LiveView
+  def handle_event("hide_delete_modal", _params, socket) do
     {:noreply, assign(socket, :show_delete_modal, false)}
   end
 
-  @impl true
-  def handle_event("confirm_delete_conversation", _, socket) do
+  @impl Phoenix.LiveView
+  def handle_event("confirm_delete_conversation", _params, socket) do
     user_id = socket.assigns.current_user.id
 
     case Chat.delete_conversation(socket.assigns.current_conversation, user_id) do
-      {:ok, _} ->
+      {:ok, _deleted} ->
         {:noreply,
          socket
          |> put_flash(:info, "Conversation deleted")
          |> push_navigate(to: ~p"/chat")}
 
-      {:error, _} ->
+      {:error, _reason} ->
         {:noreply,
          socket
          |> put_flash(:error, "Failed to delete conversation")
@@ -128,13 +129,13 @@ defmodule ChatbotWeb.ChatLive.Show do
     end
   end
 
-  @impl true
-  def handle_event("toggle_sidebar", _, socket) do
+  @impl Phoenix.LiveView
+  def handle_event("toggle_sidebar", _params, socket) do
     {:noreply, assign(socket, :sidebar_open, !socket.assigns.sidebar_open)}
   end
 
-  @impl true
-  def handle_event("export_markdown", _, socket) do
+  @impl Phoenix.LiveView
+  def handle_event("export_markdown", _params, socket) do
     conversation = socket.assigns.current_conversation
     # Reload messages from database for export (streams don't store list)
     messages = Chat.list_messages(conversation.id)
@@ -143,15 +144,14 @@ defmodule ChatbotWeb.ChatLive.Show do
 
     # Send the markdown as a download
     {:noreply,
-     socket
-     |> push_event("download", %{
+     push_event(socket, "download", %{
        filename: "#{conversation.title || "conversation"}.md",
        content: markdown_content
      })}
   end
 
-  @impl true
-  def handle_event("export_json", _, socket) do
+  @impl Phoenix.LiveView
+  def handle_event("export_json", _params, socket) do
     conversation = socket.assigns.current_conversation
     # Reload messages from database for export (streams don't store list)
     messages = Chat.list_messages(conversation.id)
@@ -176,8 +176,7 @@ defmodule ChatbotWeb.ChatLive.Show do
       )
 
     {:noreply,
-     socket
-     |> push_event("download", %{
+     push_event(socket, "download", %{
        filename: "#{conversation.title || "conversation"}.json",
        content: json_content
      })}
@@ -209,7 +208,7 @@ defmodule ChatbotWeb.ChatLive.Show do
     header <> messages_md
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def render(assigns) do
     ~H"""
     <div class="flex h-screen bg-base-100 relative">

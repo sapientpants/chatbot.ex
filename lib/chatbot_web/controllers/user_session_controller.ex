@@ -11,6 +11,7 @@ defmodule ChatbotWeb.UserSessionController do
 
   plug ChatbotWeb.Plugs.RateLimiter, :rate_limit_login when action == :create
 
+  @spec create(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def create(conn, %{"user" => user_params}) do
     %{"email" => email, "password" => password} = user_params
 
@@ -25,6 +26,7 @@ defmodule ChatbotWeb.UserSessionController do
     end
   end
 
+  @spec delete(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def delete(conn, _params) do
     conn
     |> put_flash(:info, "Logged out successfully.")

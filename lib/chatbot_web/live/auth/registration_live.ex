@@ -10,6 +10,7 @@ defmodule ChatbotWeb.RegistrationLive do
   alias Chatbot.Accounts.User
   alias ChatbotWeb.Plugs.RateLimiter
 
+  @spec render(map()) :: Phoenix.LiveView.Rendered.t()
   def render(assigns) do
     ~H"""
     <div class="min-h-screen bg-base-200">
@@ -141,6 +142,8 @@ defmodule ChatbotWeb.RegistrationLive do
     """
   end
 
+  @spec mount(map(), map(), Phoenix.LiveView.Socket.t()) ::
+          {:ok, Phoenix.LiveView.Socket.t(), keyword()}
   def mount(_params, _session, socket) do
     changeset = Accounts.change_user_registration(%User{})
 
@@ -148,7 +151,7 @@ defmodule ChatbotWeb.RegistrationLive do
     ip =
       case get_connect_info(socket, :peer_data) do
         %{address: address} -> address |> Tuple.to_list() |> Enum.join(".")
-        _ -> "unknown"
+        _error -> "unknown"
       end
 
     socket =
@@ -159,6 +162,8 @@ defmodule ChatbotWeb.RegistrationLive do
     {:ok, socket, temporary_assigns: [form: nil]}
   end
 
+  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_event("toggle_password", _params, socket) do
     {:noreply, assign(socket, :show_password, !socket.assigns.show_password)}
   end

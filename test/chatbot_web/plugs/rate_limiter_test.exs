@@ -7,9 +7,9 @@ defmodule ChatbotWeb.Plugs.RateLimiterTest do
 
   setup do
     # Clear Hammer state between tests
-    {:ok, _} = Hammer.delete_buckets("login:*")
-    {:ok, _} = Hammer.delete_buckets("registration:*")
-    {:ok, _} = Hammer.delete_buckets("messages:*")
+    {:ok, _deleted} = Hammer.delete_buckets("login:*")
+    {:ok, _deleted} = Hammer.delete_buckets("registration:*")
+    {:ok, _deleted} = Hammer.delete_buckets("messages:*")
     :ok
   end
 
@@ -54,7 +54,7 @@ defmodule ChatbotWeb.Plugs.RateLimiterTest do
         |> Phoenix.Controller.fetch_flash()
 
       # Make 5 requests (the limit)
-      Enum.each(1..5, fn _ ->
+      Enum.each(1..5, fn _i ->
         RateLimiter.rate_limit_login(conn, [])
       end)
 
@@ -79,7 +79,7 @@ defmodule ChatbotWeb.Plugs.RateLimiterTest do
         |> Phoenix.Controller.fetch_flash()
 
       # Max out rate limit for first IP
-      Enum.each(1..5, fn _ ->
+      Enum.each(1..5, fn _i ->
         RateLimiter.rate_limit_login(conn1, [])
       end)
 
@@ -109,7 +109,7 @@ defmodule ChatbotWeb.Plugs.RateLimiterTest do
         |> Phoenix.Controller.fetch_flash()
 
       # Make 3 requests (the limit)
-      Enum.each(1..3, fn _ ->
+      Enum.each(1..3, fn _i ->
         RateLimiter.rate_limit_registration(conn, [])
       end)
 
@@ -134,7 +134,7 @@ defmodule ChatbotWeb.Plugs.RateLimiterTest do
         |> Phoenix.Controller.fetch_flash()
 
       # Max out rate limit for first IP
-      Enum.each(1..3, fn _ ->
+      Enum.each(1..3, fn _i ->
         RateLimiter.rate_limit_registration(conn1, [])
       end)
 
@@ -154,7 +154,7 @@ defmodule ChatbotWeb.Plugs.RateLimiterTest do
       user_id = "user-456"
 
       # Make 30 requests (the limit)
-      Enum.each(1..30, fn _ ->
+      Enum.each(1..30, fn _i ->
         RateLimiter.check_message_rate_limit(user_id)
       end)
 
@@ -168,7 +168,7 @@ defmodule ChatbotWeb.Plugs.RateLimiterTest do
       user_id2 = "user-101"
 
       # Max out rate limit for first user
-      Enum.each(1..30, fn _ ->
+      Enum.each(1..30, fn _i ->
         RateLimiter.check_message_rate_limit(user_id1)
       end)
 
@@ -187,7 +187,7 @@ defmodule ChatbotWeb.Plugs.RateLimiterTest do
       ip = "192.168.1.101"
 
       # Make 3 requests (the limit)
-      Enum.each(1..3, fn _ ->
+      Enum.each(1..3, fn _i ->
         RateLimiter.check_registration_rate_limit(ip)
       end)
 
@@ -201,7 +201,7 @@ defmodule ChatbotWeb.Plugs.RateLimiterTest do
       ip2 = "192.168.1.103"
 
       # Max out rate limit for first IP
-      Enum.each(1..3, fn _ ->
+      Enum.each(1..3, fn _i ->
         RateLimiter.check_registration_rate_limit(ip1)
       end)
 

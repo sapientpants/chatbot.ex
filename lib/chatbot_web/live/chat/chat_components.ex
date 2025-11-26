@@ -18,6 +18,7 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
   """
   attr :sidebar_open, :boolean, required: true
 
+  @spec mobile_overlay(map()) :: Phoenix.LiveView.Rendered.t()
   def mobile_overlay(assigns) do
     ~H"""
     <%= if @sidebar_open do %>
@@ -39,6 +40,7 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
   attr :current_conversation, :any, required: true
   attr :current_user, :any, required: true
 
+  @spec chat_sidebar(map()) :: Phoenix.LiveView.Rendered.t()
   def chat_sidebar(assigns) do
     ~H"""
     <aside
@@ -132,6 +134,7 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
   attr :models_loading, :boolean, required: true
   attr :is_streaming, :boolean, required: true
 
+  @spec model_selector(map()) :: Phoenix.LiveView.Rendered.t()
   def model_selector(assigns) do
     ~H"""
     <div class="dropdown dropdown-end">
@@ -185,6 +188,7 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
   """
   attr :message, :any, required: true
 
+  @spec chat_message(map()) :: Phoenix.LiveView.Rendered.t()
   def chat_message(assigns) do
     ~H"""
     <div class={[
@@ -232,6 +236,7 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
   """
   attr :streaming_chunks, :list, required: true
 
+  @spec streaming_response(map()) :: Phoenix.LiveView.Rendered.t()
   def streaming_response(assigns) do
     ~H"""
     <div class="flex gap-4">
@@ -257,6 +262,7 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
   attr :is_streaming, :boolean, required: true
   attr :id, :string, default: "message-input"
 
+  @spec message_input_form(map()) :: Phoenix.LiveView.Rendered.t()
   def message_input_form(assigns) do
     ~H"""
     <div class="border-t border-base-300 bg-base-100 p-4">
@@ -311,6 +317,7 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
   attr :is_streaming, :boolean, required: true
   attr :streaming_chunks, :list, required: true
 
+  @spec messages_container(map()) :: Phoenix.LiveView.Rendered.t()
   def messages_container(assigns) do
     ~H"""
     <div
@@ -321,9 +328,11 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
       aria-live="polite"
       phx-hook="ScrollToBottom"
     >
-      <div id="messages-list" class="max-w-3xl mx-auto py-6 px-4 space-y-6" phx-update="stream">
-        <div :for={{dom_id, message} <- @messages} id={dom_id}>
-          <.chat_message message={message} />
+      <div class="max-w-3xl mx-auto py-6 px-4 space-y-6">
+        <div id="messages-list" phx-update="stream">
+          <div :for={{dom_id, message} <- @messages} id={dom_id} class="mb-6">
+            <.chat_message message={message} />
+          </div>
         </div>
 
         <%= if @is_streaming do %>
@@ -342,6 +351,7 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
   attr :form, :any, required: true
   attr :is_streaming, :boolean, required: true
 
+  @spec empty_chat_state(map()) :: Phoenix.LiveView.Rendered.t()
   def empty_chat_state(assigns) do
     ~H"""
     <div class="flex-1 flex flex-col items-center justify-center p-6">
@@ -392,6 +402,7 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
   Formats a model name for display, truncating if necessary.
   Max length is configured via `:chatbot, :ui, :max_model_name_length`.
   """
+  @spec format_model_name(String.t() | nil) :: String.t()
   def format_model_name(nil), do: "Select model"
 
   def format_model_name(name) do
@@ -412,6 +423,7 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
   @doc """
   Formats a timestamp for display.
   """
+  @spec format_timestamp(DateTime.t() | NaiveDateTime.t() | nil) :: String.t()
   def format_timestamp(nil), do: ""
 
   def format_timestamp(datetime) do

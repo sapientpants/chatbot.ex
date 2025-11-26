@@ -4,8 +4,17 @@ defmodule Chatbot.Accounts.UserToken do
 
   Stores secure, hashed tokens for user sessions with expiration support.
   """
+
   use Ecto.Schema
   import Ecto.Query
+
+  @type t :: %__MODULE__{
+          id: binary() | nil,
+          token: binary() | nil,
+          context: String.t() | nil,
+          user_id: binary() | nil,
+          inserted_at: DateTime.t() | nil
+        }
 
   @hash_algorithm :sha256
   @rand_size 32
@@ -30,6 +39,7 @@ defmodule Chatbot.Accounts.UserToken do
 
   Returns the token value (to be sent to client) and the token struct (to be stored in DB).
   """
+  @spec build_session_token(Chatbot.Accounts.User.t()) :: {String.t(), t()}
   def build_session_token(user) do
     token = :crypto.strong_rand_bytes(@rand_size)
     hashed_token = :crypto.hash(@hash_algorithm, token)
@@ -40,7 +50,7 @@ defmodule Chatbot.Accounts.UserToken do
        token: hashed_token,
        context: "session",
        user_id: user.id,
-       inserted_at: DateTime.utc_now() |> DateTime.truncate(:second)
+       inserted_at: DateTime.utc_now(:second)
      }}
   end
 
@@ -49,6 +59,7 @@ defmodule Chatbot.Accounts.UserToken do
 
   The query returns the user found by the token, if any.
   """
+  @spec verify_session_token_query(String.t()) :: {:ok, Ecto.Query.t()}
   def verify_session_token_query(token) do
     query =
       from token in by_token_and_context_query(token, "session"),
@@ -65,6 +76,7 @@ defmodule Chatbot.Accounts.UserToken do
   The non-hashed token is sent to the user email while the hashed part is stored in the database.
   The original token cannot be reconstructed from the hashed version.
   """
+  @spec build_hashed_token(Chatbot.Accounts.User.t(), String.t()) :: {String.t(), t()}
   def build_hashed_token(user, context) do
     token = :crypto.strong_rand_bytes(@rand_size)
     hashed_token = :crypto.hash(@hash_algorithm, token)
@@ -75,7 +87,7 @@ defmodule Chatbot.Accounts.UserToken do
        token: hashed_token,
        context: context,
        user_id: user.id,
-       inserted_at: DateTime.utc_now() |> DateTime.truncate(:second)
+       inserted_at: DateTime.utc_now(:second)
      }}
   end
 
@@ -84,6 +96,7 @@ defmodule Chatbot.Accounts.UserToken do
 
   The query returns the user found by the token, if any.
   """
+  @spec verify_reset_password_token_query(String.t()) :: {:ok, Ecto.Query.t()}
   def verify_reset_password_token_query(token) do
     query =
       from token in by_token_and_context_query(token, "reset_password"),
@@ -97,6 +110,7 @@ defmodule Chatbot.Accounts.UserToken do
   @doc """
   Returns the token struct for the given token value and context.
   """
+  @spec by_token_and_context_query(String.t(), String.t()) :: Ecto.Query.t()
   def by_token_and_context_query(token, context) do
     from Chatbot.Accounts.UserToken, where: [token: ^hash_token(token), context: ^context]
   end
@@ -113,6 +127,7 @@ defmodule Chatbot.Accounts.UserToken do
   @doc """
   Gets all tokens for the given user for the given contexts.
   """
+  @spec by_user_and_contexts_query(Chatbot.Accounts.User.t(), [String.t()]) :: Ecto.Query.t()
   def by_user_and_contexts_query(user, contexts) do
     from t in Chatbot.Accounts.UserToken,
       where: t.user_id == ^user.id and t.context in ^contexts

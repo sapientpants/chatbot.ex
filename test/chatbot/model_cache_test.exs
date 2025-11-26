@@ -35,8 +35,7 @@ defmodule Chatbot.ModelCacheTest do
     test "fetches models from LMStudio on cache miss" do
       models = [%{"id" => "test-model", "object" => "model"}]
 
-      Chatbot.LMStudioMock
-      |> expect(:list_models, fn -> {:ok, models} end)
+      expect(Chatbot.LMStudioMock, :list_models, fn -> {:ok, models} end)
 
       assert {:ok, ^models} = ModelCache.get_models()
     end
@@ -45,8 +44,7 @@ defmodule Chatbot.ModelCacheTest do
       models = [%{"id" => "cached-model", "object" => "model"}]
 
       # First call fetches from API
-      Chatbot.LMStudioMock
-      |> expect(:list_models, fn -> {:ok, models} end)
+      expect(Chatbot.LMStudioMock, :list_models, fn -> {:ok, models} end)
 
       assert {:ok, ^models} = ModelCache.get_models()
 
@@ -59,8 +57,7 @@ defmodule Chatbot.ModelCacheTest do
       models_v2 = [%{"id" => "model-v2", "object" => "model"}]
 
       # First call
-      Chatbot.LMStudioMock
-      |> expect(:list_models, fn -> {:ok, models_v1} end)
+      expect(Chatbot.LMStudioMock, :list_models, fn -> {:ok, models_v1} end)
 
       assert {:ok, ^models_v1} = ModelCache.get_models()
 
@@ -68,15 +65,13 @@ defmodule Chatbot.ModelCacheTest do
       Process.sleep(60)
 
       # Second call should fetch fresh data
-      Chatbot.LMStudioMock
-      |> expect(:list_models, fn -> {:ok, models_v2} end)
+      expect(Chatbot.LMStudioMock, :list_models, fn -> {:ok, models_v2} end)
 
       assert {:ok, ^models_v2} = ModelCache.get_models()
     end
 
     test "returns error when LMStudio fails" do
-      Chatbot.LMStudioMock
-      |> expect(:list_models, fn -> {:error, "Connection refused"} end)
+      expect(Chatbot.LMStudioMock, :list_models, fn -> {:error, "Connection refused"} end)
 
       assert {:error, "Connection refused"} = ModelCache.get_models()
     end
@@ -88,8 +83,7 @@ defmodule Chatbot.ModelCacheTest do
       models_v2 = [%{"id" => "model-v2", "object" => "model"}]
 
       # First call caches
-      Chatbot.LMStudioMock
-      |> expect(:list_models, fn -> {:ok, models_v1} end)
+      expect(Chatbot.LMStudioMock, :list_models, fn -> {:ok, models_v1} end)
 
       assert {:ok, ^models_v1} = ModelCache.get_models()
 
@@ -98,8 +92,7 @@ defmodule Chatbot.ModelCacheTest do
       Process.sleep(10)
 
       # Next call should fetch fresh
-      Chatbot.LMStudioMock
-      |> expect(:list_models, fn -> {:ok, models_v2} end)
+      expect(Chatbot.LMStudioMock, :list_models, fn -> {:ok, models_v2} end)
 
       assert {:ok, ^models_v2} = ModelCache.get_models()
     end
@@ -111,14 +104,12 @@ defmodule Chatbot.ModelCacheTest do
       models_v2 = [%{"id" => "model-v2", "object" => "model"}]
 
       # First call caches
-      Chatbot.LMStudioMock
-      |> expect(:list_models, fn -> {:ok, models_v1} end)
+      expect(Chatbot.LMStudioMock, :list_models, fn -> {:ok, models_v1} end)
 
       assert {:ok, ^models_v1} = ModelCache.get_models()
 
       # Refresh should fetch new models
-      Chatbot.LMStudioMock
-      |> expect(:list_models, fn -> {:ok, models_v2} end)
+      expect(Chatbot.LMStudioMock, :list_models, fn -> {:ok, models_v2} end)
 
       ModelCache.refresh()
       # Wait for the async refresh to complete

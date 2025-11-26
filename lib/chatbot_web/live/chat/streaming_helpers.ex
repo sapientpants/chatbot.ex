@@ -12,7 +12,9 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   import Phoenix.LiveView
   import Phoenix.Component
 
-  alias Chatbot.{Chat, LMStudio, ModelCache}
+  alias Chatbot.Chat
+  alias Chatbot.LMStudio
+  alias Chatbot.ModelCache
   alias ChatbotWeb.Plugs.RateLimiter
 
   # Helper to update a conversation in the local list without database reload
@@ -26,6 +28,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   Handles loading available models from LM Studio.
   Uses the ModelCache to avoid repeated API calls.
   """
+  @spec handle_load_models(Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_load_models(socket) do
     case ModelCache.get_models() do
       {:ok, models} ->
@@ -45,6 +49,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   Prepends the chunk to the list of streaming chunks (O(1) operation).
   Chunks are stored in reverse order and reversed when rendering.
   """
+  @spec handle_chunk(String.t(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_chunk(content, socket) do
     chunks = socket.assigns[:streaming_chunks] || []
     {:noreply, assign(socket, :streaming_chunks, [content | chunks])}
@@ -55,6 +61,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   Saves the complete message to the database and updates the UI.
   Uses stream_insert for efficient updates with LiveView streams.
   """
+  @spec handle_done(binary(), binary(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_done(conversation_id, _user_id, socket) do
     chunks = socket.assigns[:streaming_chunks] || []
     # Chunks are stored in reverse order, so reverse before combining
@@ -101,6 +109,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   Handles errors during streaming.
   Displays error message to the user and resets streaming state.
   """
+  @spec handle_streaming_error(String.t(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_streaming_error(error_msg, socket) do
     {:noreply,
      socket
@@ -113,6 +123,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   Sends a user message and starts streaming AI response.
   Includes rate limiting and error handling.
   """
+  @spec send_message_with_streaming(String.t(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def send_message_with_streaming(content, socket) do
     if String.trim(content) == "" do
       {:noreply, socket}
@@ -222,6 +234,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   @doc """
   Handles model selection change.
   """
+  @spec handle_select_model(String.t(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_select_model(model_id, socket) do
     {:noreply, assign(socket, :selected_model, model_id)}
   end
@@ -229,6 +243,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   @doc """
   Creates a new conversation and navigates to the chat index.
   """
+  @spec handle_new_conversation(Phoenix.LiveView.Socket.t(), String.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_new_conversation(socket, redirect_path) do
     user_id = socket.assigns.current_user.id
 
@@ -256,6 +272,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   Handles task crash/completion monitoring.
   Returns appropriate response based on the reason.
   """
+  @spec handle_task_down(atom() | term(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_task_down(:normal, socket) do
     # Task completed normally, nothing to do
     {:noreply, socket}

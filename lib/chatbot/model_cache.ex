@@ -17,6 +17,7 @@ defmodule Chatbot.ModelCache do
   @doc """
   Starts the ModelCache GenServer.
   """
+  @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
@@ -24,6 +25,8 @@ defmodule Chatbot.ModelCache do
   @doc """
   Gets the cached model list, fetching from LM Studio if needed.
   Returns {:ok, models} or {:error, reason}.
+
+  Uses GenServer call to serialize cache misses and prevent thundering herd.
   """
   @spec get_models() :: {:ok, [map()]} | {:error, String.t()}
   def get_models do
@@ -32,15 +35,8 @@ defmodule Chatbot.ModelCache do
         {:ok, models}
 
       :miss ->
-        # Cache miss, fetch from LM Studio
-        case lm_studio_client().list_models() do
-          {:ok, models} ->
-            cache_models(models)
-            {:ok, models}
-
-          {:error, reason} ->
-            {:error, reason}
-        end
+        # Cache miss - use GenServer call to serialize fetches
+        GenServer.call(__MODULE__, :fetch_models)
     end
   end
 
@@ -62,13 +58,32 @@ defmodule Chatbot.ModelCache do
 
   # Server callbacks
 
-  @impl true
+  @impl GenServer
   def init(_opts) do
     table = :ets.new(@table_name, [:named_table, :public, read_concurrency: true])
     {:ok, %{table: table}}
   end
 
-  @impl true
+  @impl GenServer
+  def handle_call(:fetch_models, _from, state) do
+    # Double-check pattern - cache may have been populated by another process
+    case lookup_models() do
+      {:ok, models} ->
+        {:reply, {:ok, models}, state}
+
+      :miss ->
+        result = lm_studio_client().list_models()
+
+        case result do
+          {:ok, models} -> cache_models(models)
+          _error -> :ok
+        end
+
+        {:reply, result, state}
+    end
+  end
+
+  @impl GenServer
   def handle_cast(:refresh, state) do
     case lm_studio_client().list_models() do
       {:ok, models} ->
@@ -81,7 +96,7 @@ defmodule Chatbot.ModelCache do
     {:noreply, state}
   end
 
-  @impl true
+  @impl GenServer
   def handle_cast(:clear, state) do
     :ets.delete_all_objects(@table_name)
     {:noreply, state}

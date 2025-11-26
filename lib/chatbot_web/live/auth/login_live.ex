@@ -6,6 +6,7 @@ defmodule ChatbotWeb.LoginLive do
   """
   use ChatbotWeb, :live_view
 
+  @spec render(map()) :: Phoenix.LiveView.Rendered.t()
   def render(assigns) do
     ~H"""
     <div class="min-h-screen bg-base-200">
@@ -41,6 +42,8 @@ defmodule ChatbotWeb.LoginLive do
     """
   end
 
+  @spec mount(map(), map(), Phoenix.LiveView.Socket.t()) ::
+          {:ok, Phoenix.LiveView.Socket.t(), keyword()}
   def mount(_params, _session, socket) do
     email = Phoenix.Flash.get(socket.assigns.flash, :email)
     form = to_form(%{"email" => email}, as: "user")

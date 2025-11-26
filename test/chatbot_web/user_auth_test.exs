@@ -224,18 +224,18 @@ defmodule ChatbotWeb.UserAuthTest do
       session = %{"user_token" => token}
       socket = %Phoenix.LiveView.Socket{assigns: %{__changed__: %{}}}
 
-      {:cont, socket} = UserAuth.on_mount(:mount_current_user, %{}, session, socket)
+      {:cont, updated_socket} = UserAuth.on_mount(:mount_current_user, %{}, session, socket)
 
-      assert socket.assigns.current_user.id == user.id
+      assert updated_socket.assigns.current_user.id == user.id
     end
 
     test "assigns nil when no session token" do
       session = %{}
       socket = %Phoenix.LiveView.Socket{assigns: %{__changed__: %{}}}
 
-      {:cont, socket} = UserAuth.on_mount(:mount_current_user, %{}, session, socket)
+      {:cont, updated_socket} = UserAuth.on_mount(:mount_current_user, %{}, session, socket)
 
-      refute socket.assigns.current_user
+      refute updated_socket.assigns.current_user
     end
   end
 
@@ -245,18 +245,18 @@ defmodule ChatbotWeb.UserAuthTest do
       session = %{"user_token" => token}
       socket = %Phoenix.LiveView.Socket{assigns: %{__changed__: %{}, flash: %{}}}
 
-      {:cont, socket} = UserAuth.on_mount(:ensure_authenticated, %{}, session, socket)
+      {:cont, updated_socket} = UserAuth.on_mount(:ensure_authenticated, %{}, session, socket)
 
-      assert socket.assigns.current_user.id == user.id
+      assert updated_socket.assigns.current_user.id == user.id
     end
 
     test "halts and redirects when not authenticated" do
       session = %{}
       socket = %Phoenix.LiveView.Socket{assigns: %{__changed__: %{}, flash: %{}}}
 
-      {:halt, socket} = UserAuth.on_mount(:ensure_authenticated, %{}, session, socket)
+      {:halt, halted_socket} = UserAuth.on_mount(:ensure_authenticated, %{}, session, socket)
 
-      assert socket.redirected == {:redirect, %{to: "/login", status: 302}}
+      assert halted_socket.redirected == {:redirect, %{to: "/login", status: 302}}
     end
   end
 
@@ -266,20 +266,20 @@ defmodule ChatbotWeb.UserAuthTest do
       session = %{"user_token" => token}
       socket = %Phoenix.LiveView.Socket{assigns: %{__changed__: %{}}}
 
-      {:halt, socket} =
+      {:halt, halted_socket} =
         UserAuth.on_mount(:redirect_if_user_is_authenticated, %{}, session, socket)
 
-      assert socket.redirected == {:redirect, %{to: "/chat", status: 302}}
+      assert halted_socket.redirected == {:redirect, %{to: "/chat", status: 302}}
     end
 
     test "continues when not authenticated" do
       session = %{}
       socket = %Phoenix.LiveView.Socket{assigns: %{__changed__: %{}}}
 
-      {:cont, socket} =
+      {:cont, updated_socket} =
         UserAuth.on_mount(:redirect_if_user_is_authenticated, %{}, session, socket)
 
-      refute socket.assigns.current_user
+      refute updated_socket.assigns.current_user
     end
   end
 end

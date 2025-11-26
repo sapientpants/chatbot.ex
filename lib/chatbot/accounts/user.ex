@@ -6,6 +6,15 @@ defmodule Chatbot.Accounts.User do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @type t :: %__MODULE__{
+          id: binary() | nil,
+          email: String.t() | nil,
+          hashed_password: String.t() | nil,
+          password: String.t() | nil,
+          inserted_at: DateTime.t() | nil,
+          updated_at: DateTime.t() | nil
+        }
+
   @primary_key {:id, :binary_id, autogenerate: false}
   @foreign_key_type :binary_id
 
@@ -42,6 +51,7 @@ defmodule Chatbot.Accounts.User do
       submitting the form), this option can be set to `false`.
       Defaults to `true`.
   """
+  @spec registration_changeset(t() | Ecto.Changeset.t(), map(), keyword()) :: Ecto.Changeset.t()
   def registration_changeset(user, attrs, opts \\ []) do
     user
     |> cast(attrs, [:email, :password])
@@ -113,13 +123,16 @@ defmodule Chatbot.Accounts.User do
 
   It requires the email to change otherwise an error is added.
   """
+  @spec email_changeset(t() | Ecto.Changeset.t(), map(), keyword()) :: Ecto.Changeset.t()
   def email_changeset(user, attrs, opts \\ []) do
-    user
-    |> cast(attrs, [:email])
-    |> validate_email(opts)
-    |> case do
-      %{changes: %{email: _}} = changeset -> changeset
-      %{} = changeset -> add_error(changeset, :email, "did not change")
+    changeset =
+      user
+      |> cast(attrs, [:email])
+      |> validate_email(opts)
+
+    case changeset do
+      %{changes: %{email: _email}} -> changeset
+      %{} -> add_error(changeset, :email, "did not change")
     end
   end
 
@@ -135,6 +148,7 @@ defmodule Chatbot.Accounts.User do
       validations on a LiveView form), this option can be set to `false`.
       Defaults to `true`.
   """
+  @spec password_changeset(t() | Ecto.Changeset.t(), map(), keyword()) :: Ecto.Changeset.t()
   def password_changeset(user, attrs, opts \\ []) do
     user
     |> cast(attrs, [:password])
@@ -145,8 +159,9 @@ defmodule Chatbot.Accounts.User do
   @doc """
   Confirms the account by setting `confirmed_at`.
   """
+  @spec confirm_changeset(t()) :: Ecto.Changeset.t()
   def confirm_changeset(user) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = DateTime.utc_now(:second)
     change(user, confirmed_at: now)
   end
 
@@ -156,12 +171,14 @@ defmodule Chatbot.Accounts.User do
   If there is no user or the user doesn't have a password, we call
   `Bcrypt.no_user_verify/0` to avoid timing attacks.
   """
+  @spec valid_password?(t() | nil, String.t()) :: boolean()
   def valid_password?(%Chatbot.Accounts.User{hashed_password: hashed_password}, password)
       when is_binary(hashed_password) and byte_size(password) > 0 do
     Bcrypt.verify_pass(password, hashed_password)
   end
 
-  def valid_password?(_, _) do
+  @spec valid_password?(t() | nil, String.t()) :: boolean()
+  def valid_password?(_user, _password) do
     Bcrypt.no_user_verify()
     false
   end
@@ -169,6 +186,7 @@ defmodule Chatbot.Accounts.User do
   @doc """
   Validates the current password otherwise adds an error to the changeset.
   """
+  @spec validate_current_password(Ecto.Changeset.t(), String.t()) :: Ecto.Changeset.t()
   def validate_current_password(changeset, password) do
     changeset = cast(changeset, %{}, [])
 

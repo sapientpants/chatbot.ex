@@ -9,6 +9,7 @@ defmodule ChatbotWeb.ForgotPasswordLive do
   alias Chatbot.Accounts
   alias ChatbotWeb.Plugs.RateLimiter
 
+  @spec render(map()) :: Phoenix.LiveView.Rendered.t()
   def render(assigns) do
     ~H"""
     <div class="min-h-screen bg-base-200">
@@ -38,10 +39,13 @@ defmodule ChatbotWeb.ForgotPasswordLive do
     """
   end
 
+  @spec mount(map(), map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
   def mount(_params, _session, socket) do
     {:ok, assign(socket, form: to_form(%{"email" => ""}, as: "user"))}
   end
 
+  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_event("send_reset_link", %{"user" => %{"email" => email}}, socket) do
     case RateLimiter.check_password_reset_rate_limit(email) do
       :ok ->

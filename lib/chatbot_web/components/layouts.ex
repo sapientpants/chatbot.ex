@@ -33,6 +33,7 @@ defmodule ChatbotWeb.Layouts do
 
   slot :inner_block, required: true
 
+  @spec app(map()) :: Phoenix.LiveView.Rendered.t()
   def app(assigns) do
     ~H"""
     <header class="navbar px-4 sm:px-6 lg:px-8">
@@ -82,6 +83,7 @@ defmodule ChatbotWeb.Layouts do
   attr :flash, :map, required: true, doc: "the map of flash messages"
   attr :id, :string, default: "flash-group", doc: "the optional id of flash container"
 
+  @spec flash_group(map()) :: Phoenix.LiveView.Rendered.t()
   def flash_group(assigns) do
     ~H"""
     <div id={@id} aria-live="polite">
@@ -120,6 +122,7 @@ defmodule ChatbotWeb.Layouts do
 
   See <head> in root.html.heex which applies the theme before page load.
   """
+  @spec theme_toggle(map()) :: Phoenix.LiveView.Rendered.t()
   def theme_toggle(assigns) do
     ~H"""
     <div
@@ -172,6 +175,7 @@ defmodule ChatbotWeb.Layouts do
   """
   attr :current_user, :map, default: nil, doc: "the currently logged in user, if any"
 
+  @spec navbar(map()) :: Phoenix.LiveView.Rendered.t()
   def navbar(assigns) do
     ~H"""
     <!-- Skip to main content link for keyboard users -->

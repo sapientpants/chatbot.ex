@@ -8,10 +8,11 @@ defmodule Chatbot.Repo do
     otp_app: :chatbot,
     adapter: Ecto.Adapters.Postgres
 
-  @impl true
+  @impl Ecto.Repo
   def init(_type, config) do
     {:ok, config}
   end
 
+  @spec generate_uuid() :: String.t()
   def generate_uuid, do: Uniq.UUID.uuid7()
 end

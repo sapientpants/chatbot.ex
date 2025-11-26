@@ -169,7 +169,7 @@ defmodule Chatbot.AccountsTest do
       user = user_fixture()
 
       # The token returned by this function is the encoded token that would be sent to the user
-      {:ok, _} =
+      {:ok, _notification} =
         Accounts.deliver_user_reset_password_instructions(user, fn token ->
           # Capture the token for testing
           send(self(), {:reset_token, token})
@@ -204,21 +204,24 @@ defmodule Chatbot.AccountsTest do
 
     test "deletes all reset password tokens after successful reset" do
       user = user_fixture()
-      {:ok, _} = Accounts.deliver_user_reset_password_instructions(user, fn token -> token end)
+
+      {:ok, _notification} =
+        Accounts.deliver_user_reset_password_instructions(user, fn token -> token end)
 
       new_password = "NewValidPassword123!"
 
-      {:ok, _} =
+      {:ok, _updated_user} =
         Accounts.reset_user_password(user, %{
           password: new_password,
           password_confirmation: new_password
         })
 
       # Verify all reset password tokens are deleted
-      refute Chatbot.Repo.exists?(
-               from t in Chatbot.Accounts.UserToken,
-                 where: t.user_id == ^user.id and t.context == "reset_password"
-             )
+      token_query =
+        from t in Chatbot.Accounts.UserToken,
+          where: t.user_id == ^user.id and t.context == "reset_password"
+
+      refute Chatbot.Repo.exists?(token_query)
     end
 
     test "returns error changeset for invalid password" do

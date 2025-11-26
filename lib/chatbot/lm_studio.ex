@@ -57,11 +57,11 @@ defmodule Chatbot.LMStudio do
         result = fun.()
 
         case result do
-          {:error, _} ->
+          {:error, _reason} ->
             :fuse.melt(@fuse_name)
             result
 
-          _ ->
+          _success ->
             result
         end
     end
@@ -190,7 +190,7 @@ defmodule Chatbot.LMStudio do
 
   defp process_sse_chunk(json_string, pid) do
     case Jason.decode(json_string) do
-      {:ok, %{"choices" => [%{"delta" => delta} | _]}} ->
+      {:ok, %{"choices" => [%{"delta" => delta} | _rest]}} ->
         if content = delta["content"] do
           send(pid, {:chunk, content})
         end

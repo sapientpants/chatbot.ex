@@ -133,50 +133,62 @@
           {Credo.Check.Warning.UnusedRegexOperation, []},
           {Credo.Check.Warning.UnusedStringOperation, []},
           {Credo.Check.Warning.UnusedTupleOperation, []},
-          {Credo.Check.Warning.WrongTestFileExtension, []}
-        ],
-        disabled: [
-          #
-          # Checks scheduled for next check update (opt-in for now)
-          #
-          {Credo.Check.Refactor.UtcNowTruncate, []},
+          {Credo.Check.Warning.WrongTestFileExtension, []},
 
+          ## Previously disabled checks (now enabled with sensible config)
           #
-          # Controversial and experimental checks (opt-in, just move the check to `:enabled`
-          # and be sure to use `mix credo --strict` to see low priority checks)
-          #
+          # Consistency
           {Credo.Check.Consistency.MultiAliasImportRequireUse, []},
-          {Credo.Check.Consistency.UnusedVariableNames, []},
-          {Credo.Check.Design.DuplicatedCode, []},
+          {Credo.Check.Consistency.UnusedVariableNames, [force: :meaningful]},
+
+          # Design
+          {Credo.Check.Design.DuplicatedCode,
+           [mass_threshold: 60, excluded_macros: [:test, :describe]]},
           {Credo.Check.Design.SkipTestWithoutComment, []},
+
+          # Readability
           {Credo.Check.Readability.AliasAs, []},
           {Credo.Check.Readability.BlockPipe, []},
           {Credo.Check.Readability.ImplTrue, []},
           {Credo.Check.Readability.MultiAlias, []},
-          {Credo.Check.Readability.NestedFunctionCalls, []},
+          {Credo.Check.Readability.NestedFunctionCalls, [min_pipeline_length: 3]},
           {Credo.Check.Readability.SeparateAliasRequire, []},
           {Credo.Check.Readability.SingleFunctionToBlockPipe, []},
-          {Credo.Check.Readability.SinglePipe, []},
-          {Credo.Check.Readability.Specs, []},
-          {Credo.Check.Readability.StrictModuleLayout, []},
+          {Credo.Check.Readability.SinglePipe, [priority: :low]},
+          {Credo.Check.Readability.Specs, [files: %{excluded: [~r"/test/"]}]},
+          {Credo.Check.Readability.StrictModuleLayout,
+           [
+             files: %{excluded: [~r"/test/"]},
+             order: ~w(shortdoc moduledoc behaviour use import alias require)a
+           ]},
           {Credo.Check.Readability.WithCustomTaggedTuple, []},
-          {Credo.Check.Refactor.ABCSize, []},
+
+          # Refactor
+          {Credo.Check.Refactor.ABCSize, [max_size: 60]},
           {Credo.Check.Refactor.AppendSingleItem, []},
           {Credo.Check.Refactor.DoubleBooleanNegation, []},
           {Credo.Check.Refactor.FilterFilter, []},
           {Credo.Check.Refactor.IoPuts, []},
           {Credo.Check.Refactor.MapMap, []},
-          {Credo.Check.Refactor.ModuleDependencies, []},
+          {Credo.Check.Refactor.ModuleDependencies, [max_deps: 25]},
           {Credo.Check.Refactor.NegatedIsNil, []},
-          {Credo.Check.Refactor.PipeChainStart, []},
+          {Credo.Check.Refactor.PipeChainStart,
+           [
+             excluded_functions: ["from"],
+             excluded_argument_types: [:atom, :binary, :fn, :keyword]
+           ]},
           {Credo.Check.Refactor.RejectReject, []},
-          {Credo.Check.Refactor.VariableRebinding, []},
+          {Credo.Check.Refactor.UtcNowTruncate, []},
+          {Credo.Check.Refactor.VariableRebinding, [priority: :low]},
+
+          # Warnings
           {Credo.Check.Warning.LazyLogging, []},
           {Credo.Check.Warning.LeakyEnvironment, []},
           {Credo.Check.Warning.MapGetUnsafePass, []},
           {Credo.Check.Warning.MixEnv, []},
           {Credo.Check.Warning.UnsafeToAtom, []}
-        ]
+        ],
+        disabled: []
       }
     }
   ]
