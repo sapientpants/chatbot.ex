@@ -12,7 +12,7 @@ defmodule ChatbotWeb.Plugs.RateLimiter do
   @doc """
   Plug callback for initialization.
   """
-  @spec init(keyword()) :: keyword()
+  @spec init(atom() | keyword()) :: atom() | keyword()
   def init(opts), do: opts
 
   @doc """

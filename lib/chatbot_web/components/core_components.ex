@@ -488,7 +488,10 @@ defmodule ChatbotWeb.CoreComponents do
 
   ## JS Commands
 
-  @spec show(Phoenix.LiveView.JS.t(), String.t()) :: Phoenix.LiveView.JS.t()
+  @doc """
+  Shows an element with animation transition.
+  """
+  @spec show(map(), String.t()) :: map()
   def show(js \\ %JS{}, selector) do
     JS.show(js,
       to: selector,
@@ -500,7 +503,10 @@ defmodule ChatbotWeb.CoreComponents do
     )
   end
 
-  @spec hide(Phoenix.LiveView.JS.t(), String.t()) :: Phoenix.LiveView.JS.t()
+  @doc """
+  Hides an element with animation transition.
+  """
+  @spec hide(map(), String.t()) :: map()
   def hide(js \\ %JS{}, selector) do
     JS.hide(js,
       to: selector,
