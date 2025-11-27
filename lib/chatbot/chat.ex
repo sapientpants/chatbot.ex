@@ -18,6 +18,7 @@ defmodule Chatbot.Chat do
       [%Conversation{}, ...]
 
   """
+  @spec list_conversations(binary()) :: [Conversation.t()]
   def list_conversations(user_id) do
     Conversation
     |> where([c], c.user_id == ^user_id)
@@ -39,6 +40,7 @@ defmodule Chatbot.Chat do
       ** (Ecto.NoResultsError)
 
   """
+  @spec get_conversation!(binary(), binary()) :: Conversation.t()
   def get_conversation!(id, user_id) do
     Conversation
     |> where([c], c.id == ^id and c.user_id == ^user_id)
@@ -64,6 +66,7 @@ defmodule Chatbot.Chat do
       %Conversation{messages: [%Message{}, ...]}
 
   """
+  @spec get_conversation_with_messages!(binary(), binary(), keyword()) :: Conversation.t()
   def get_conversation_with_messages!(id, user_id, opts \\ []) do
     limit = Keyword.get(opts, :limit, 100)
     offset = Keyword.get(opts, :offset, 0)
@@ -93,6 +96,7 @@ defmodule Chatbot.Chat do
       {:error, %Ecto.Changeset{}}
 
   """
+  @spec create_conversation(map()) :: {:ok, Conversation.t()} | {:error, Ecto.Changeset.t()}
   def create_conversation(attrs \\ %{}) do
     %Conversation{}
     |> Conversation.changeset(attrs)
@@ -111,6 +115,8 @@ defmodule Chatbot.Chat do
       {:error, %Ecto.Changeset{}}
 
   """
+  @spec update_conversation(Conversation.t(), map()) ::
+          {:ok, Conversation.t()} | {:error, Ecto.Changeset.t()}
   def update_conversation(%Conversation{} = conversation, attrs) do
     conversation
     |> Conversation.changeset(attrs)
@@ -129,6 +135,8 @@ defmodule Chatbot.Chat do
       {:error, :unauthorized}
 
   """
+  @spec delete_conversation(Conversation.t(), binary()) ::
+          {:ok, Conversation.t()} | {:error, :unauthorized | Ecto.Changeset.t()}
   def delete_conversation(%Conversation{} = conversation, user_id) do
     if conversation.user_id == user_id do
       Repo.delete(conversation)
@@ -146,6 +154,7 @@ defmodule Chatbot.Chat do
       %Ecto.Changeset{data: %Conversation{}}
 
   """
+  @spec change_conversation(Conversation.t(), map()) :: Ecto.Changeset.t()
   def change_conversation(%Conversation{} = conversation, attrs \\ %{}) do
     Conversation.changeset(conversation, attrs)
   end
@@ -164,11 +173,30 @@ defmodule Chatbot.Chat do
       {:error, :unauthorized}
 
   """
+  @spec verify_conversation_access(binary(), binary()) ::
+          {:ok, Conversation.t()} | {:error, :unauthorized}
   def verify_conversation_access(conversation_id, user_id) do
     case Repo.get_by(Conversation, id: conversation_id, user_id: user_id) do
       nil -> {:error, :unauthorized}
       conversation -> {:ok, conversation}
     end
+  end
+
+  @doc """
+  Returns the list of messages for a conversation.
+
+  ## Examples
+
+      iex> list_messages(conversation_id)
+      [%Message{}, ...]
+
+  """
+  @spec list_messages(binary()) :: [Message.t()]
+  def list_messages(conversation_id) do
+    Message
+    |> where([m], m.conversation_id == ^conversation_id)
+    |> order_by([m], asc: m.inserted_at)
+    |> Repo.all()
   end
 
   @doc """
@@ -183,6 +211,7 @@ defmodule Chatbot.Chat do
       {:error, %Ecto.Changeset{}}
 
   """
+  @spec create_message(map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
   def create_message(attrs \\ %{}) do
     %Message{}
     |> Message.changeset(attrs)
@@ -202,6 +231,7 @@ defmodule Chatbot.Chat do
       "This is a very long message that should be trunca..."
 
   """
+  @spec generate_conversation_title(String.t() | any()) :: String.t()
   def generate_conversation_title(first_message) when is_binary(first_message) do
     case String.trim(first_message) do
       "" ->
@@ -212,7 +242,8 @@ defmodule Chatbot.Chat do
     end
   end
 
-  def generate_conversation_title(_), do: "New Conversation"
+  @spec generate_conversation_title(any()) :: String.t()
+  def generate_conversation_title(_message), do: "New Conversation"
 
   @doc """
   Builds messages in OpenAI format for API calls.
@@ -223,6 +254,7 @@ defmodule Chatbot.Chat do
       [%{role: "user", content: "Hello"}]
 
   """
+  @spec build_openai_messages([Message.t()]) :: [%{role: String.t(), content: String.t()}]
   def build_openai_messages(messages) do
     Enum.map(messages, fn msg ->
       %{role: msg.role, content: msg.content}

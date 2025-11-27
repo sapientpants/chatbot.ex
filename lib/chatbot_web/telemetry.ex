@@ -7,11 +7,12 @@ defmodule ChatbotWeb.Telemetry do
   use Supervisor
   import Telemetry.Metrics
 
+  @spec start_link(term()) :: Supervisor.on_start()
   def start_link(arg) do
     Supervisor.start_link(__MODULE__, arg, name: __MODULE__)
   end
 
-  @impl true
+  @impl Supervisor
   def init(_arg) do
     children = [
       # Telemetry poller will execute the given period measurements
@@ -24,6 +25,7 @@ defmodule ChatbotWeb.Telemetry do
     Supervisor.init(children, strategy: :one_for_one)
   end
 
+  @spec metrics() :: [Telemetry.Metrics.t()]
   def metrics do
     [
       # Phoenix Metrics

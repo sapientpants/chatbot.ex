@@ -6,6 +6,16 @@ defmodule Chatbot.Chat.Conversation do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @type t :: %__MODULE__{
+          id: binary() | nil,
+          title: String.t() | nil,
+          model_name: String.t() | nil,
+          user_id: binary() | nil,
+          messages: [Chatbot.Chat.Message.t()] | Ecto.Association.NotLoaded.t(),
+          inserted_at: DateTime.t() | nil,
+          updated_at: DateTime.t() | nil
+        }
+
   @primary_key {:id, :binary_id, autogenerate: false}
   @foreign_key_type :binary_id
 
@@ -21,6 +31,7 @@ defmodule Chatbot.Chat.Conversation do
   end
 
   @doc false
+  @spec changeset(t() | Ecto.Changeset.t(), map()) :: Ecto.Changeset.t()
   def changeset(conversation, attrs) do
     conversation
     |> cast(attrs, [:title, :model_name, :user_id])

@@ -83,10 +83,10 @@ defmodule ChatbotWeb.UserSessionControllerTest do
       assert conn.resp_cookies["_chatbot_web_user_remember_me"]
 
       # Then logout
-      conn = delete(conn, ~p"/logout")
+      logout_conn = delete(conn, ~p"/logout")
 
       # Verify cookie is deleted (max_age: 0 marks it for deletion)
-      assert conn.resp_cookies["_chatbot_web_user_remember_me"].max_age == 0
+      assert logout_conn.resp_cookies["_chatbot_web_user_remember_me"].max_age == 0
     end
   end
 end

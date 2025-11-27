@@ -4,9 +4,12 @@ defmodule Chatbot.Accounts do
   """
 
   import Ecto.Query, warn: false
+
+  alias Chatbot.Accounts.User
+  alias Chatbot.Accounts.UserToken
   alias Chatbot.Repo
 
-  alias Chatbot.Accounts.{User, UserToken}
+  require Logger
 
   ## User registration
 
@@ -22,6 +25,7 @@ defmodule Chatbot.Accounts do
       {:error, %Ecto.Changeset{}}
 
   """
+  @spec register_user(map()) :: {:ok, User.t()} | {:error, Ecto.Changeset.t()}
   def register_user(attrs) do
     %User{}
     |> User.registration_changeset(attrs)
@@ -37,6 +41,7 @@ defmodule Chatbot.Accounts do
       %Ecto.Changeset{data: %User{}}
 
   """
+  @spec change_user_registration(User.t(), map()) :: Ecto.Changeset.t()
   def change_user_registration(%User{} = user, attrs \\ %{}) do
     User.registration_changeset(user, attrs, hash_password: false, validate_email: false)
   end
@@ -55,6 +60,7 @@ defmodule Chatbot.Accounts do
       nil
 
   """
+  @spec get_user_by_email_and_password(String.t(), String.t()) :: User.t() | nil
   def get_user_by_email_and_password(email, password)
       when is_binary(email) and is_binary(password) do
     user = Repo.get_by(User, email: email)
@@ -77,6 +83,7 @@ defmodule Chatbot.Accounts do
       ** (Ecto.NoResultsError)
 
   """
+  @spec get_user!(binary()) :: User.t()
   def get_user!(id), do: Repo.get!(User, id)
 
   ## Session
@@ -91,6 +98,7 @@ defmodule Chatbot.Accounts do
       iex> generate_user_session_token(user)
       "token_string"
   """
+  @spec generate_user_session_token(User.t()) :: String.t()
   def generate_user_session_token(user) do
     {token, user_token} = UserToken.build_session_token(user)
     Repo.insert!(user_token)
@@ -108,12 +116,14 @@ defmodule Chatbot.Accounts do
       iex> get_user_by_session_token(invalid_token)
       nil
   """
+  @spec get_user_by_session_token(String.t() | nil) :: User.t() | nil
   def get_user_by_session_token(token) when is_binary(token) do
     {:ok, query} = UserToken.verify_session_token_query(token)
     Repo.one(query)
   end
 
-  def get_user_by_session_token(_), do: nil
+  @spec get_user_by_session_token(nil) :: nil
+  def get_user_by_session_token(_invalid_token), do: nil
 
   @doc """
   Deletes the session token.
@@ -123,6 +133,7 @@ defmodule Chatbot.Accounts do
       iex> delete_user_session_token(token)
       :ok
   """
+  @spec delete_user_session_token(String.t()) :: :ok
   def delete_user_session_token(token) do
     Repo.delete_all(UserToken.by_token_and_context_query(token, "session"))
     :ok
@@ -136,6 +147,7 @@ defmodule Chatbot.Accounts do
       iex> delete_user_session_tokens(user)
       {count, nil}
   """
+  @spec delete_user_session_tokens(User.t()) :: {non_neg_integer(), nil}
   def delete_user_session_tokens(user) do
     Repo.delete_all(UserToken.by_user_and_contexts_query(user, ["session"]))
   end
@@ -154,6 +166,8 @@ defmodule Chatbot.Accounts do
       {:ok, %{to: ..., body: ...}}
 
   """
+  @spec deliver_user_reset_password_instructions(User.t(), (String.t() -> String.t())) ::
+          {:ok, map()}
   def deliver_user_reset_password_instructions(%User{} = user, reset_password_url_fun)
       when is_function(reset_password_url_fun, 1) do
     {encoded_token, user_token} = UserToken.build_hashed_token(user, "reset_password")
@@ -162,7 +176,7 @@ defmodule Chatbot.Accounts do
     # In production, you would send an actual email here
     reset_url = reset_password_url_fun.(encoded_token)
 
-    IO.puts("""
+    Logger.debug("""
     ==============================
     Password Reset Instructions
     ==============================
@@ -191,12 +205,13 @@ defmodule Chatbot.Accounts do
       nil
 
   """
+  @spec get_user_by_reset_password_token(String.t()) :: User.t() | nil
   def get_user_by_reset_password_token(token) do
     with {:ok, query} <- UserToken.verify_reset_password_token_query(token),
          %User{} = user <- Repo.one(query) do
       user
     else
-      _ -> nil
+      _error -> nil
     end
   end
 
@@ -212,10 +227,11 @@ defmodule Chatbot.Accounts do
       {:error, %Ecto.Changeset{}}
 
   """
+  @spec reset_user_password(User.t(), map()) :: {:ok, User.t()} | {:error, Ecto.Changeset.t()}
   def reset_user_password(user, attrs) do
     Repo.transaction(fn ->
       with {:ok, user} <- update_user_password(user, attrs),
-           {_, nil} <-
+           {_count, nil} <-
              {Repo.delete_all(UserToken.by_user_and_contexts_query(user, ["reset_password"])),
               nil} do
         user
@@ -240,6 +256,7 @@ defmodule Chatbot.Accounts do
       %Ecto.Changeset{data: %User{}}
 
   """
+  @spec change_user_password(User.t(), map()) :: Ecto.Changeset.t()
   def change_user_password(user, attrs \\ %{}) do
     User.password_changeset(user, attrs, hash_password: false)
   end
@@ -256,6 +273,7 @@ defmodule Chatbot.Accounts do
       nil
 
   """
+  @spec get_user_by_email(String.t()) :: User.t() | nil
   def get_user_by_email(email) when is_binary(email) do
     Repo.get_by(User, email: email)
   end

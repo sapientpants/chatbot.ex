@@ -11,6 +11,27 @@ config :chatbot,
   ecto_repos: [Chatbot.Repo],
   generators: [timestamp_type: :utc_datetime]
 
+# Rate limiting configuration
+config :chatbot, :rate_limits,
+  login: [window_ms: 60_000, max_attempts: 5],
+  registration: [window_ms: 3_600_000, max_attempts: 3],
+  password_reset: [window_ms: 3_600_000, max_attempts: 3],
+  messages: [window_ms: 60_000, max_attempts: 10],
+  messages_burst: [window_ms: 10_000, max_attempts: 3]
+
+# LM Studio API configuration
+config :chatbot, :lm_studio,
+  base_url: "http://localhost:1234/v1",
+  stream_timeout_ms: 300_000
+
+# Model cache configuration
+config :chatbot, :model_cache, ttl_ms: 60_000
+
+# UI configuration
+config :chatbot, :ui,
+  max_model_name_length: 20,
+  max_textarea_height_px: 200
+
 # Configures the endpoint
 config :chatbot, ChatbotWeb.Endpoint,
   url: [host: "localhost"],
@@ -32,11 +53,12 @@ config :chatbot, ChatbotWeb.Endpoint,
 config :chatbot, Chatbot.Mailer, adapter: Swoosh.Adapters.Local
 
 # Configure esbuild (the version is required)
+# Uses code splitting to lazy-load highlight.js and reduce initial bundle size
 config :esbuild,
   version: "0.25.4",
   chatbot: [
     args:
-      ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
+      ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --splitting --format=esm --external:/fonts/* --external:/images/* --alias:@=.),
     cd: Path.expand("../assets", __DIR__),
     env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
   ]

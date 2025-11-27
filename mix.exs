@@ -75,6 +75,8 @@ defmodule Chatbot.MixProject do
       {:req, "~> 0.5"},
       {:bcrypt_elixir, "~> 3.0"},
       {:earmark, "~> 1.4"},
+      {:html_sanitize_ex, "~> 1.4"},
+      {:fuse, "~> 2.5"},
       {:makeup_elixir, ">= 0.0.0"},
       {:uniq, "~> 0.6"},
       {:telemetry_metrics, "~> 1.0"},
@@ -90,6 +92,8 @@ defmodule Chatbot.MixProject do
       {:sobelow, "~> 0.14", only: [:dev, :test], runtime: false},
       {:ex_check, "~> 0.16", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18", only: :test},
+      {:mox, "~> 1.0", only: :test},
+      {:bypass, "~> 2.1", only: :test},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false}
     ]
   end

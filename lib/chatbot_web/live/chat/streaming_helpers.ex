@@ -12,15 +12,26 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   import Phoenix.LiveView
   import Phoenix.Component
 
-  alias Chatbot.{Chat, LMStudio}
+  alias Chatbot.Chat
+  alias Chatbot.LMStudio
+  alias Chatbot.ModelCache
   alias ChatbotWeb.Plugs.RateLimiter
+
+  # Helper to update a conversation in the local list without database reload
+  defp update_conversation_in_list(conversations, updated_conversation) do
+    Enum.map(conversations, fn conv ->
+      if conv.id == updated_conversation.id, do: updated_conversation, else: conv
+    end)
+  end
 
   @doc """
   Handles loading available models from LM Studio.
-  Sends the result back to the calling LiveView process.
+  Uses the ModelCache to avoid repeated API calls.
   """
+  @spec handle_load_models(Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_load_models(socket) do
-    case LMStudio.list_models() do
+    case ModelCache.get_models() do
       {:ok, models} ->
         model_list = Enum.map(models, & &1["id"])
         {:noreply, assign(socket, :available_models, model_list)}
@@ -35,48 +46,57 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
 
   @doc """
   Handles incoming streaming chunks from the AI model.
-  Appends the chunk to the list of streaming chunks.
+  Prepends the chunk to the list of streaming chunks (O(1) operation).
+  Chunks are stored in reverse order and reversed when rendering.
   """
+  @spec handle_chunk(String.t(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_chunk(content, socket) do
     chunks = socket.assigns[:streaming_chunks] || []
-    {:noreply, assign(socket, :streaming_chunks, chunks ++ [content])}
+    {:noreply, assign(socket, :streaming_chunks, [content | chunks])}
   end
 
   @doc """
   Handles completion of streaming response.
   Saves the complete message to the database and updates the UI.
+  Uses stream_insert for efficient updates with LiveView streams.
   """
-  def handle_done(conversation_id, user_id, socket) do
+  @spec handle_done(Phoenix.LiveView.Socket.t()) :: {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_done(socket) do
+    conversation_id = socket.assigns.current_conversation.id
     chunks = socket.assigns[:streaming_chunks] || []
-    complete_message = IO.iodata_to_binary(chunks)
+    # Chunks are stored in reverse order, so reverse before combining
+    complete_message = chunks |> Enum.reverse() |> IO.iodata_to_binary()
 
     if complete_message != "" do
       # Save assistant message
-      {:ok, _message} =
-        Chat.create_message(%{
-          conversation_id: conversation_id,
-          role: "assistant",
-          content: complete_message
-        })
+      case Chat.create_message(%{
+             conversation_id: conversation_id,
+             role: "assistant",
+             content: complete_message
+           }) do
+        {:ok, message} ->
+          # Update conversation's updated_at locally instead of reloading from DB
+          current_conv = socket.assigns.current_conversation
+          updated_conv = %{current_conv | updated_at: DateTime.utc_now()}
+          conversations = update_conversation_in_list(socket.assigns.conversations, updated_conv)
 
-      # Append the new message to the existing list instead of reloading all
-      new_message = %Chatbot.Chat.Message{
-        conversation_id: conversation_id,
-        role: "assistant",
-        content: complete_message,
-        inserted_at: DateTime.utc_now()
-      }
+          {:noreply,
+           socket
+           |> stream_insert(:messages, message, at: -1)
+           |> assign(:current_conversation, updated_conv)
+           |> assign(:conversations, conversations)
+           |> assign(:is_streaming, false)
+           |> assign(:streaming_chunks, [])
+           |> assign(:form, to_form(%{"content" => ""}, as: :message))}
 
-      messages = socket.assigns.messages ++ [new_message]
-      conversations = Chat.list_conversations(user_id)
-
-      {:noreply,
-       socket
-       |> assign(:messages, messages)
-       |> assign(:conversations, conversations)
-       |> assign(:is_streaming, false)
-       |> assign(:streaming_chunks, [])
-       |> assign(:form, to_form(%{"content" => ""}, as: :message))}
+        {:error, _changeset} ->
+          {:noreply,
+           socket
+           |> put_flash(:error, "Failed to save assistant message")
+           |> assign(:is_streaming, false)
+           |> assign(:streaming_chunks, [])}
+      end
     else
       {:noreply,
        socket
@@ -89,6 +109,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   Handles errors during streaming.
   Displays error message to the user and resets streaming state.
   """
+  @spec handle_streaming_error(String.t(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_streaming_error(error_msg, socket) do
     {:noreply,
      socket
@@ -101,6 +123,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   Sends a user message and starts streaming AI response.
   Includes rate limiting and error handling.
   """
+  @spec send_message_with_streaming(String.t(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def send_message_with_streaming(content, socket) do
     if String.trim(content) == "" do
       {:noreply, socket}
@@ -123,99 +147,155 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
     user_id = socket.assigns.current_user.id
 
     # Save user message
-    {:ok, user_message} =
-      Chat.create_message(%{
-        conversation_id: conversation_id,
-        role: "user",
-        content: content
-      })
+    case Chat.create_message(%{
+           conversation_id: conversation_id,
+           role: "user",
+           content: content
+         }) do
+      {:ok, user_message} ->
+        # Update conversation title if it's the first message
+        socket = maybe_update_title(socket, content, user_id)
 
-    # Update conversation title if it's the first message
-    socket =
-      if socket.assigns.current_conversation.title == "New Conversation" do
-        title = Chat.generate_conversation_title(content)
+        # Load messages from DB for OpenAI API (streams don't keep data in assigns)
+        messages = Chat.list_messages(conversation_id)
 
-        {:ok, updated_conversation} =
-          Chat.update_conversation(socket.assigns.current_conversation, %{title: title})
+        # Build OpenAI format messages
+        openai_messages = Chat.build_openai_messages(messages)
 
-        socket
-        |> assign(:current_conversation, updated_conversation)
-        |> assign(:conversations, Chat.list_conversations(user_id))
-      else
-        socket
+        # Start streaming response from LM Studio
+        model = socket.assigns.selected_model || "default"
+
+        # Update conversation model if changed
+        socket = maybe_update_model(socket, model)
+
+        # Capture LiveView PID before starting Task and monitor it
+        liveview_pid = self()
+
+        {:ok, task_pid} =
+          Task.Supervisor.start_child(Chatbot.TaskSupervisor, fn ->
+            LMStudio.stream_chat_completion(openai_messages, model, liveview_pid)
+          end)
+
+        # Monitor the task to handle crashes
+        Process.monitor(task_pid)
+
+        {:noreply,
+         socket
+         |> stream_insert(:messages, user_message, at: -1)
+         |> assign(:has_messages, true)
+         |> assign(:streaming_chunks, [])
+         |> assign(:streaming_task_pid, task_pid)
+         |> assign(:is_streaming, true)
+         |> assign(:form, to_form(%{"content" => ""}, as: :message))}
+
+      {:error, _changeset} ->
+        {:noreply, put_flash(socket, :error, "Failed to save message")}
+    end
+  end
+
+  defp maybe_update_title(socket, content, _user_id) do
+    if socket.assigns.current_conversation.title == "New Conversation" do
+      title = Chat.generate_conversation_title(content)
+
+      case Chat.update_conversation(socket.assigns.current_conversation, %{title: title}) do
+        {:ok, updated_conversation} ->
+          # Update locally instead of reloading from DB
+          conversations =
+            update_conversation_in_list(socket.assigns.conversations, updated_conversation)
+
+          socket
+          |> assign(:current_conversation, updated_conversation)
+          |> assign(:conversations, conversations)
+
+        {:error, _changeset} ->
+          # Title update failed, but we can continue without it
+          socket
       end
+    else
+      socket
+    end
+  end
 
-    # Append user message to existing messages instead of reloading
-    messages = socket.assigns.messages ++ [user_message]
+  defp maybe_update_model(socket, model) do
+    if socket.assigns.current_conversation.model_name != model do
+      case Chat.update_conversation(socket.assigns.current_conversation, %{model_name: model}) do
+        {:ok, updated_conv} ->
+          assign(socket, :current_conversation, updated_conv)
 
-    # Build OpenAI format messages
-    openai_messages = Chat.build_openai_messages(messages)
-
-    # Start streaming response from LM Studio
-    model = socket.assigns.selected_model || "default"
-
-    # Update conversation model if changed
-    socket =
-      if socket.assigns.current_conversation.model_name != model do
-        {:ok, updated_conv} =
-          Chat.update_conversation(socket.assigns.current_conversation, %{model_name: model})
-
-        assign(socket, :current_conversation, updated_conv)
-      else
-        socket
+        {:error, _changeset} ->
+          # Model update failed, but we can continue
+          socket
       end
-
-    # Capture LiveView PID before starting Task and monitor it
-    liveview_pid = self()
-
-    {:ok, task_pid} =
-      Task.Supervisor.start_child(Chatbot.TaskSupervisor, fn ->
-        LMStudio.stream_chat_completion(openai_messages, model, liveview_pid)
-      end)
-
-    # Monitor the task to handle crashes
-    Process.monitor(task_pid)
-
-    {:noreply,
-     socket
-     |> assign(:messages, messages)
-     |> assign(:streaming_chunks, [])
-     |> assign(:streaming_task_pid, task_pid)
-     |> assign(:is_streaming, true)
-     |> assign(:form, to_form(%{"content" => ""}, as: :message))}
+    else
+      socket
+    end
   end
 
   @doc """
   Handles model selection change.
   """
+  @spec handle_select_model(String.t(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_select_model(model_id, socket) do
     {:noreply, assign(socket, :selected_model, model_id)}
   end
 
   @doc """
-  Creates a new conversation and navigates to the chat index.
+  Creates a new conversation.
+
+  Options:
+    - `:redirect_to` - Path to navigate to after creation (optional)
+    - `:reset_streaming` - Whether to reset streaming state (default: false)
   """
-  def handle_new_conversation(socket, redirect_path) do
+  @spec handle_new_conversation(Phoenix.LiveView.Socket.t(), keyword()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_new_conversation(socket, opts \\ []) do
     user_id = socket.assigns.current_user.id
 
-    {:ok, conversation} =
-      Chat.create_conversation(%{
-        user_id: user_id,
-        title: "New Conversation"
-      })
+    case Chat.create_conversation(%{
+           user_id: user_id,
+           title: "New Conversation"
+         }) do
+      {:ok, conversation} ->
+        # Prepend new conversation to list instead of reloading from DB
+        conversations = [conversation | socket.assigns.conversations]
 
-    {:noreply,
-     socket
-     |> assign(:current_conversation, conversation)
-     |> assign(:messages, [])
-     |> assign(:conversations, Chat.list_conversations(user_id))
-     |> push_navigate(to: redirect_path)}
+        socket =
+          socket
+          |> assign(:current_conversation, conversation)
+          |> stream(:messages, [], reset: true)
+          |> assign(:conversations, conversations)
+
+        socket =
+          if opts[:reset_streaming] do
+            socket
+            |> assign(:has_messages, false)
+            |> assign(:streaming_chunks, [])
+            |> assign(:selected_model, conversation.model_name)
+          else
+            socket
+          end
+
+        socket =
+          if redirect_path = opts[:redirect_to] do
+            push_navigate(socket, to: redirect_path)
+          else
+            socket
+          end
+
+        {:noreply, socket}
+
+      {:error, _changeset} ->
+        {:noreply, put_flash(socket, :error, "Failed to create conversation")}
+    end
   end
 
   @doc """
   Handles task crash/completion monitoring.
   Returns appropriate response based on the reason.
   """
+  @spec handle_task_down(atom() | term(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_task_down(:normal, socket) do
     # Task completed normally, nothing to do
     {:noreply, socket}

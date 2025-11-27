@@ -5,7 +5,7 @@ defmodule Chatbot.Application do
 
   use Application
 
-  @impl true
+  @impl Application
   def start(_type, _args) do
     children = [
       ChatbotWeb.Telemetry,
@@ -14,6 +14,8 @@ defmodule Chatbot.Application do
       {Phoenix.PubSub, name: Chatbot.PubSub},
       # Rate limiting backend
       {Hammer.Backend.ETS, [expiry_ms: 60_000 * 60 * 4, cleanup_interval_ms: 60_000 * 10]},
+      # Model list cache
+      Chatbot.ModelCache,
       # Task supervisor for background tasks
       {Task.Supervisor, name: Chatbot.TaskSupervisor},
       # Start to serve requests, typically the last entry
@@ -28,7 +30,7 @@ defmodule Chatbot.Application do
 
   # Tell Phoenix to update the endpoint configuration
   # whenever the application is updated.
-  @impl true
+  @impl Application
   def config_change(changed, _new, removed) do
     ChatbotWeb.Endpoint.config_change(changed, removed)
     :ok
