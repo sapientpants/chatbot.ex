@@ -61,9 +61,9 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   Saves the complete message to the database and updates the UI.
   Uses stream_insert for efficient updates with LiveView streams.
   """
-  @spec handle_done(binary(), binary(), Phoenix.LiveView.Socket.t()) ::
-          {:noreply, Phoenix.LiveView.Socket.t()}
-  def handle_done(conversation_id, _user_id, socket) do
+  @spec handle_done(Phoenix.LiveView.Socket.t()) :: {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_done(socket) do
+    conversation_id = socket.assigns.current_conversation.id
     chunks = socket.assigns[:streaming_chunks] || []
     # Chunks are stored in reverse order, so reverse before combining
     complete_message = chunks |> Enum.reverse() |> IO.iodata_to_binary()
@@ -241,11 +241,15 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   end
 
   @doc """
-  Creates a new conversation and navigates to the chat index.
+  Creates a new conversation.
+
+  Options:
+    - `:redirect_to` - Path to navigate to after creation (optional)
+    - `:reset_streaming` - Whether to reset streaming state (default: false)
   """
-  @spec handle_new_conversation(Phoenix.LiveView.Socket.t(), String.t()) ::
+  @spec handle_new_conversation(Phoenix.LiveView.Socket.t(), keyword()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
-  def handle_new_conversation(socket, redirect_path) do
+  def handle_new_conversation(socket, opts \\ []) do
     user_id = socket.assigns.current_user.id
 
     case Chat.create_conversation(%{
@@ -256,12 +260,30 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
         # Prepend new conversation to list instead of reloading from DB
         conversations = [conversation | socket.assigns.conversations]
 
-        {:noreply,
-         socket
-         |> assign(:current_conversation, conversation)
-         |> stream(:messages, [], reset: true)
-         |> assign(:conversations, conversations)
-         |> push_navigate(to: redirect_path)}
+        socket =
+          socket
+          |> assign(:current_conversation, conversation)
+          |> stream(:messages, [], reset: true)
+          |> assign(:conversations, conversations)
+
+        socket =
+          if opts[:reset_streaming] do
+            socket
+            |> assign(:has_messages, false)
+            |> assign(:streaming_chunks, [])
+            |> assign(:selected_model, conversation.model_name)
+          else
+            socket
+          end
+
+        socket =
+          if redirect_path = opts[:redirect_to] do
+            push_navigate(socket, to: redirect_path)
+          else
+            socket
+          end
+
+        {:noreply, socket}
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Failed to create conversation")}

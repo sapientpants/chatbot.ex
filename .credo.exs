@@ -143,7 +143,11 @@
 
           # Design
           {Credo.Check.Design.DuplicatedCode,
-           [mass_threshold: 60, excluded_macros: [:test, :describe]]},
+           [
+             mass_threshold: 30,
+             excluded_macros: [:test, :describe],
+             files: %{excluded: [~r"/test/"]}
+           ]},
           {Credo.Check.Design.SkipTestWithoutComment, []},
 
           # Readability

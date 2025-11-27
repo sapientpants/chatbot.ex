@@ -41,17 +41,7 @@ defmodule Chatbot.Accounts.UserToken do
   """
   @spec build_session_token(Chatbot.Accounts.User.t()) :: {String.t(), t()}
   def build_session_token(user) do
-    token = :crypto.strong_rand_bytes(@rand_size)
-    hashed_token = :crypto.hash(@hash_algorithm, token)
-
-    {Base.url_encode64(token, padding: false),
-     %Chatbot.Accounts.UserToken{
-       id: Chatbot.Repo.generate_uuid(),
-       token: hashed_token,
-       context: "session",
-       user_id: user.id,
-       inserted_at: DateTime.utc_now(:second)
-     }}
+    build_hashed_token(user, "session")
   end
 
   @doc """

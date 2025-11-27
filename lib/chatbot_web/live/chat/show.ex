@@ -68,11 +68,7 @@ defmodule ChatbotWeb.ChatLive.Show do
 
   @impl Phoenix.LiveView
   def handle_info({:done, _metadata}, socket) do
-    conversation_id = socket.assigns.current_conversation.id
-    user_id = socket.assigns.current_user.id
-
-    # StreamingHelpers.handle_done updates conversations list locally
-    StreamingHelpers.handle_done(conversation_id, user_id, socket)
+    StreamingHelpers.handle_done(socket)
   end
 
   @impl Phoenix.LiveView
@@ -97,7 +93,7 @@ defmodule ChatbotWeb.ChatLive.Show do
 
   @impl Phoenix.LiveView
   def handle_event("new_conversation", _params, socket) do
-    StreamingHelpers.handle_new_conversation(socket, ~p"/chat")
+    StreamingHelpers.handle_new_conversation(socket, redirect_to: ~p"/chat")
   end
 
   @impl Phoenix.LiveView

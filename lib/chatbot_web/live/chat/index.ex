@@ -82,11 +82,7 @@ defmodule ChatbotWeb.ChatLive.Index do
 
   @impl Phoenix.LiveView
   def handle_info({:done, _metadata}, socket) do
-    conversation_id = socket.assigns.current_conversation.id
-    user_id = socket.assigns.current_user.id
-
-    # StreamingHelpers.handle_done updates conversations list locally
-    StreamingHelpers.handle_done(conversation_id, user_id, socket)
+    StreamingHelpers.handle_done(socket)
   end
 
   @impl Phoenix.LiveView
@@ -111,28 +107,7 @@ defmodule ChatbotWeb.ChatLive.Index do
 
   @impl Phoenix.LiveView
   def handle_event("new_conversation", _params, socket) do
-    user_id = socket.assigns.current_user.id
-
-    case Chat.create_conversation(%{
-           user_id: user_id,
-           title: "New Conversation"
-         }) do
-      {:ok, conversation} ->
-        # Prepend new conversation to list instead of reloading from DB
-        conversations = [conversation | socket.assigns.conversations]
-
-        {:noreply,
-         socket
-         |> assign(:current_conversation, conversation)
-         |> stream(:messages, [], reset: true)
-         |> assign(:has_messages, false)
-         |> assign(:streaming_chunks, [])
-         |> assign(:conversations, conversations)
-         |> assign(:selected_model, conversation.model_name)}
-
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to create conversation")}
-    end
+    StreamingHelpers.handle_new_conversation(socket, reset_streaming: true)
   end
 
   @impl Phoenix.LiveView
