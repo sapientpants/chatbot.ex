@@ -34,6 +34,15 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
     case ModelCache.get_models() do
       {:ok, models} ->
         model_list = Enum.map(models, & &1["id"])
+
+        # Auto-select the first model if none is currently selected
+        socket =
+          if is_nil(socket.assigns.selected_model) and model_list != [] do
+            assign(socket, :selected_model, List.first(model_list))
+          else
+            socket
+          end
+
         {:noreply, assign(socket, :available_models, model_list)}
 
       {:error, _reason} ->
@@ -271,7 +280,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
             socket
             |> assign(:has_messages, false)
             |> assign(:streaming_chunks, [])
-            |> assign(:selected_model, conversation.model_name)
+
+            # Keep the current selected_model - don't reset to nil
           else
             socket
           end
