@@ -176,7 +176,7 @@ defmodule Chatbot.Accounts do
     # In production, you would send an actual email here
     reset_url = reset_password_url_fun.(encoded_token)
 
-    Logger.info("""
+    Logger.debug("""
     ==============================
     Password Reset Instructions
     ==============================

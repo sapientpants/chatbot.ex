@@ -113,10 +113,10 @@ const Hooks = {
   // Uses flex-col-reverse so scrollTop=0 shows the bottom (no flicker on load)
   ScrollToBottom: {
     mounted() {
-      this.highlightCode()
+      this.highlightCode().catch(err => console.error("Failed to highlight code:", err))
     },
     updated() {
-      this.highlightCode()
+      this.highlightCode().catch(err => console.error("Failed to highlight code:", err))
       this.scrollToBottom()
     },
     scrollToBottom() {
