@@ -100,7 +100,7 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
       
     <!-- User Section -->
       <div class="p-3 border-t border-base-300">
-        <div class="flex items-center gap-3 p-2 rounded-lg bg-base-300/50">
+        <div class="flex items-center gap-3 p-2 rounded-lg">
           <div class="avatar placeholder">
             <div class="bg-primary text-primary-content rounded-full w-9 h-9">
               <span class="text-sm font-semibold">
