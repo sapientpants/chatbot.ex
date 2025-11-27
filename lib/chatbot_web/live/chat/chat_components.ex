@@ -101,12 +101,8 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
     <!-- User Section -->
       <div class="p-3 border-t border-base-300">
         <div class="flex items-center gap-3 p-2 rounded-lg">
-          <div class="avatar placeholder">
-            <div class="bg-primary text-primary-content rounded-full w-9 h-9 flex items-center justify-center">
-              <span class="text-sm font-semibold">
-                {String.first(@current_user.email) |> String.upcase()}
-              </span>
-            </div>
+          <div class="bg-primary text-primary-content rounded-full w-9 h-9 flex items-center justify-center shrink-0">
+            <span class="text-sm font-semibold text-center">{get_initials(@current_user.email)}</span>
           </div>
           <div class="flex-1 min-w-0">
             <div class="text-sm font-medium truncate">{@current_user.email}</div>
@@ -429,4 +425,24 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
   def format_timestamp(datetime) do
     Calendar.strftime(datetime, "%I:%M %p")
   end
+
+  @doc """
+  Extracts initials from an email address.
+  For "john.doe@example.com" returns "JD".
+  For "johndoe@example.com" returns "J".
+  """
+  @spec get_initials(String.t()) :: String.t()
+  def get_initials(email) when is_binary(email) do
+    email
+    |> String.split("@")
+    |> List.first("")
+    |> String.split(~r/[._-]/)
+    |> Enum.map(&String.first/1)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.take(2)
+    |> Enum.join()
+    |> String.upcase()
+  end
+
+  def get_initials(_email), do: "?"
 end
