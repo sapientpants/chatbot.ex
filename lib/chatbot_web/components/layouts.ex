@@ -141,7 +141,7 @@ defmodule ChatbotWeb.Layouts do
       >
         <.icon
           name="hero-computer-desktop-micro"
-          class="size-5 opacity-60 group-hover:opacity-100 group-hover:text-primary transition-all [:not([data-theme])_&]:opacity-100 [:not([data-theme])_&]:text-primary"
+          class="size-5 opacity-60 group-hover:opacity-100 group-hover:text-primary transition-all [html:not([data-theme])_&]:opacity-100 [html:not([data-theme])_&]:text-primary"
         />
       </button>
 
