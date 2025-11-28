@@ -175,10 +175,20 @@ defmodule ChatbotWeb.RegistrationLive do
     case RateLimiter.check_registration_rate_limit(ip) do
       :ok ->
         case Accounts.register_user(user_params) do
-          {:ok, _user} ->
+          {:ok, user} ->
+            # Send confirmation email
+            {:ok, _email} =
+              Accounts.deliver_user_confirmation_instructions(
+                user,
+                &url(~p"/confirm/#{&1}")
+              )
+
             {:noreply,
              socket
-             |> put_flash(:info, "Account created successfully!")
+             |> put_flash(
+               :info,
+               "Account created! Please check your email to confirm your account."
+             )
              |> redirect(to: ~p"/login")}
 
           {:error, %Ecto.Changeset{} = changeset} ->

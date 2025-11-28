@@ -8,11 +8,12 @@ defmodule ChatbotWeb.Endpoint do
 
   # The session will be stored in the cookie, signed and encrypted.
   # This prevents both tampering and reading of session contents.
+  # In production, use SIGNING_SALT and ENCRYPTION_SALT environment variables.
   @session_options [
     store: :cookie,
     key: "_chatbot_key",
-    signing_salt: "8ir2WoZd",
-    encryption_salt: "X9kP2mNq",
+    signing_salt: Application.compile_env(:chatbot, :signing_salt, "8ir2WoZd"),
+    encryption_salt: Application.compile_env(:chatbot, :encryption_salt, "X9kP2mNq"),
     same_site: "Lax",
     secure: Mix.env() == :prod,
     http_only: true

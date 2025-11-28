@@ -45,7 +45,9 @@ defmodule Chatbot.LMStudioTest do
         |> Plug.Conn.resp(500, Jason.encode!(%{"error" => "Internal Server Error"}))
       end)
 
-      assert {:error, "Unexpected status: 500"} = LMStudio.list_models()
+      # Error message is sanitized to not expose internal details
+      assert {:error, "Failed to load models. Please check if LM Studio is running."} =
+               LMStudio.list_models()
     end
 
     test "returns error when connection fails", %{bypass: bypass} do
@@ -92,8 +94,9 @@ defmodule Chatbot.LMStudioTest do
         |> Plug.Conn.resp(400, Jason.encode!(%{"error" => "Bad Request"}))
       end)
 
-      assert {:error, message} = LMStudio.chat_completion(messages, model)
-      assert message =~ "Status 400"
+      # Error message is sanitized to not expose internal details
+      assert {:error, "Failed to get AI response. Please try again."} =
+               LMStudio.chat_completion(messages, model)
     end
 
     test "returns error when connection fails", %{bypass: bypass} do

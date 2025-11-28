@@ -19,10 +19,12 @@ defmodule Chatbot.Accounts.UserToken do
   @hash_algorithm :sha256
   @rand_size 32
 
-  # Session tokens expire after 60 days
-  @session_validity_in_days 60
+  # Session tokens expire after 7 days (reduced from 60 for security)
+  @session_validity_in_days 7
   # Reset password tokens expire after 1 day
   @reset_password_validity_in_days 1
+  # Email confirmation tokens expire after 7 days
+  @confirm_validity_in_days 7
 
   @primary_key {:id, :binary_id, autogenerate: false}
   @foreign_key_type :binary_id
@@ -121,5 +123,31 @@ defmodule Chatbot.Accounts.UserToken do
   def by_user_and_contexts_query(user, contexts) do
     from t in Chatbot.Accounts.UserToken,
       where: t.user_id == ^user.id and t.context in ^contexts
+  end
+
+  @doc """
+  Checks if the confirmation token is valid and returns its underlying lookup query.
+
+  The query returns the user found by the token, if any.
+  """
+  @spec verify_email_token_query(String.t(), String.t()) :: {:ok, Ecto.Query.t()}
+  def verify_email_token_query(token, context) do
+    query =
+      from token in by_token_and_context_query(token, context),
+        join: user in assoc(token, :user),
+        where: token.inserted_at > ago(@confirm_validity_in_days, "day"),
+        select: user
+
+    {:ok, query}
+  end
+
+  @doc """
+  Builds an email token for the given user and context.
+
+  Returns the token value (to be sent to client) and the token struct (to be stored in DB).
+  """
+  @spec build_email_token(Chatbot.Accounts.User.t(), String.t()) :: {String.t(), t()}
+  def build_email_token(user, context) do
+    build_hashed_token(user, context)
   end
 end

@@ -130,33 +130,45 @@ defmodule ChatbotWeb.Layouts do
       aria-label="Theme selection"
       class="card relative flex flex-row items-center border-2 border-base-300 bg-base-300 rounded-full"
     >
-      <div class="absolute w-1/3 h-full rounded-full border-1 border-base-200 bg-base-100 brightness-200 left-0 [[data-theme=light]_&]:left-1/3 [[data-theme=dark]_&]:left-2/3 transition-[left]" />
+      <div class="absolute w-11 h-11 rounded-full border-1 border-base-200 bg-base-100 brightness-200 left-0 [[data-theme=light]_&]:left-1/3 [[data-theme=dark]_&]:left-2/3 transition-[left]" />
 
       <button
-        class="flex p-2 cursor-pointer w-1/3"
+        class="group relative z-10 flex p-2 cursor-pointer w-1/3 rounded-full hover:bg-base-100/50 transition-colors"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="system"
         aria-label="Use system theme"
+        title="Use system theme"
       >
-        <.icon name="hero-computer-desktop-micro" class="size-4 opacity-75 hover:opacity-100" />
+        <.icon
+          name="hero-computer-desktop-micro"
+          class="size-5 opacity-60 group-hover:opacity-100 group-hover:text-primary transition-all [html:not([data-theme])_&]:opacity-100 [html:not([data-theme])_&]:text-primary"
+        />
       </button>
 
       <button
-        class="flex p-2 cursor-pointer w-1/3"
+        class="group relative z-10 flex p-2 cursor-pointer w-1/3 rounded-full hover:bg-base-100/50 transition-colors"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="light"
         aria-label="Use light theme"
+        title="Use light theme"
       >
-        <.icon name="hero-sun-micro" class="size-4 opacity-75 hover:opacity-100" />
+        <.icon
+          name="hero-sun-micro"
+          class="size-5 opacity-60 group-hover:opacity-100 group-hover:text-primary transition-all [[data-theme=light]_&]:opacity-100 [[data-theme=light]_&]:text-primary"
+        />
       </button>
 
       <button
-        class="flex p-2 cursor-pointer w-1/3"
+        class="group relative z-10 flex p-2 cursor-pointer w-1/3 rounded-full hover:bg-base-100/50 transition-colors"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="dark"
         aria-label="Use dark theme"
+        title="Use dark theme"
       >
-        <.icon name="hero-moon-micro" class="size-4 opacity-75 hover:opacity-100" />
+        <.icon
+          name="hero-moon-micro"
+          class="size-5 opacity-60 group-hover:opacity-100 group-hover:text-primary transition-all [[data-theme=dark]_&]:opacity-100 [[data-theme=dark]_&]:text-primary"
+        />
       </button>
     </div>
     """
@@ -198,7 +210,7 @@ defmodule ChatbotWeb.Layouts do
       </div>
       <div class="flex-none">
         <nav aria-label="Main navigation">
-          <ul class="menu menu-horizontal px-1 gap-2">
+          <ul class="menu menu-horizontal px-1 gap-2 items-center">
             <li>
               <.theme_toggle />
             </li>

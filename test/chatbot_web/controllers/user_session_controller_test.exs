@@ -3,8 +3,8 @@ defmodule ChatbotWeb.UserSessionControllerTest do
 
   import Chatbot.Fixtures
 
-  # Match the remember me cookie max_age from UserAuth (60 days)
-  @remember_me_max_age 60 * 60 * 24 * 60
+  # Match the remember me cookie max_age from UserAuth (7 days)
+  @remember_me_max_age 60 * 60 * 24 * 7
 
   setup do
     %{user: user_fixture()}

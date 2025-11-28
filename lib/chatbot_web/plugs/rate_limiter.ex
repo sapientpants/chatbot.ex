@@ -129,9 +129,25 @@ defmodule ChatbotWeb.Plugs.RateLimiter do
   defp default_config(:messages), do: [window_ms: 60_000, max_attempts: 10]
   defp default_config(:messages_burst), do: [window_ms: 10_000, max_attempts: 3]
 
-  defp get_ip(conn) do
-    conn.remote_ip
-    |> Tuple.to_list()
-    |> Enum.join(".")
+  @doc """
+  Extracts the client IP address from the connection.
+  Handles X-Forwarded-For headers for requests behind proxies/load balancers.
+  """
+  @spec get_ip(Plug.Conn.t()) :: String.t()
+  def get_ip(conn) do
+    case Plug.Conn.get_req_header(conn, "x-forwarded-for") do
+      [forwarded | _rest] ->
+        # X-Forwarded-For can contain multiple IPs: "client, proxy1, proxy2"
+        # The first IP is the original client
+        forwarded
+        |> String.split(",")
+        |> List.first()
+        |> String.trim()
+
+      [] ->
+        conn.remote_ip
+        |> Tuple.to_list()
+        |> Enum.join(".")
+    end
   end
 end

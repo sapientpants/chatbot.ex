@@ -29,14 +29,26 @@ defmodule Chatbot.Fixtures do
 
   @doc """
   Generate a user.
+
+  By default creates a confirmed user for easier testing.
+  Pass `confirmed: false` to create an unconfirmed user.
   """
   def user_fixture(attrs \\ %{}) do
+    {confirmed, attrs} = Map.pop(attrs, :confirmed, true)
+
     {:ok, user} =
       attrs
       |> valid_user_attributes()
       |> Accounts.register_user()
 
-    user
+    if confirmed do
+      # Confirm the user directly in the database for testing
+      user
+      |> Ecto.Changeset.change(%{confirmed_at: DateTime.utc_now(:second)})
+      |> Chatbot.Repo.update!()
+    else
+      user
+    end
   end
 
   @doc """

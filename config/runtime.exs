@@ -55,6 +55,19 @@ if config_env() == :prod do
 
   config :chatbot, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
+  # Session cookie salts - generate with: mix phx.gen.secret 32
+  signing_salt =
+    System.get_env("SIGNING_SALT") ||
+      raise "environment variable SIGNING_SALT is missing"
+
+  encryption_salt =
+    System.get_env("ENCRYPTION_SALT") ||
+      raise "environment variable ENCRYPTION_SALT is missing"
+
+  config :chatbot,
+    signing_salt: signing_salt,
+    encryption_salt: encryption_salt
+
   config :chatbot, ChatbotWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
