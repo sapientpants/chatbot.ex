@@ -37,6 +37,13 @@ defmodule ChatbotWeb.Router do
     plug :accepts, ["json"]
   end
 
+  # Handle .well-known requests (Chrome DevTools, etc.) to avoid NoRouteError log noise
+  scope "/.well-known", ChatbotWeb do
+    pipe_through :api
+
+    match :*, "/*path", WellKnownController, :index
+  end
+
   scope "/", ChatbotWeb do
     pipe_through :browser
 
