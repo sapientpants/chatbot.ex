@@ -185,19 +185,36 @@ defmodule Chatbot.Chat do
   @doc """
   Returns the list of messages for a conversation.
 
+  ## Options
+
+    * `:limit` - Maximum number of messages to return (default: all)
+    * `:offset` - Number of messages to skip (default: 0)
+
   ## Examples
 
       iex> list_messages(conversation_id)
       [%Message{}, ...]
 
+      iex> list_messages(conversation_id, limit: 50, offset: 0)
+      [%Message{}, ...]
+
   """
-  @spec list_messages(binary()) :: [Message.t()]
-  def list_messages(conversation_id) do
+  @spec list_messages(binary(), keyword()) :: [Message.t()]
+  def list_messages(conversation_id, opts \\ []) do
     Message
     |> where([m], m.conversation_id == ^conversation_id)
     |> order_by([m], asc: m.inserted_at)
+    |> maybe_limit(Keyword.get(opts, :limit))
+    |> maybe_offset(Keyword.get(opts, :offset))
     |> Repo.all()
   end
+
+  defp maybe_limit(query, nil), do: query
+  defp maybe_limit(query, limit), do: limit(query, ^limit)
+
+  defp maybe_offset(query, nil), do: query
+  defp maybe_offset(query, 0), do: query
+  defp maybe_offset(query, offset), do: offset(query, ^offset)
 
   @doc """
   Creates a message.

@@ -37,6 +37,13 @@ defmodule ChatbotWeb.LoginLive do
             Log in <span aria-hidden="true">→</span>
           </.button>
         </.form>
+
+        <p class="text-center text-sm mt-4 text-base-content/70">
+          Didn't receive confirmation email?
+          <.link navigate={~p"/confirm/resend"} class="font-semibold text-primary hover:underline">
+            Resend confirmation
+          </.link>
+        </p>
       </div>
     </div>
     """

@@ -130,7 +130,7 @@ defmodule ChatbotWeb.Layouts do
       aria-label="Theme selection"
       class="card relative flex flex-row items-center border-2 border-base-300 bg-base-300 rounded-full"
     >
-      <div class="absolute w-1/3 h-full rounded-full border-1 border-base-200 bg-base-100 brightness-200 left-0 [[data-theme=light]_&]:left-1/3 [[data-theme=dark]_&]:left-2/3 transition-[left]" />
+      <div class="absolute w-11 h-11 rounded-full border-1 border-base-200 bg-base-100 brightness-200 left-0 [[data-theme=light]_&]:left-1/3 [[data-theme=dark]_&]:left-2/3 transition-[left]" />
 
       <button
         class="group relative z-10 flex p-2 cursor-pointer w-1/3 rounded-full hover:bg-base-100/50 transition-colors"
@@ -210,7 +210,7 @@ defmodule ChatbotWeb.Layouts do
       </div>
       <div class="flex-none">
         <nav aria-label="Main navigation">
-          <ul class="menu menu-horizontal px-1 gap-2">
+          <ul class="menu menu-horizontal px-1 gap-2 items-center">
             <li>
               <.theme_toggle />
             </li>

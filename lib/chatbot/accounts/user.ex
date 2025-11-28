@@ -11,6 +11,7 @@ defmodule Chatbot.Accounts.User do
           email: String.t() | nil,
           hashed_password: String.t() | nil,
           password: String.t() | nil,
+          confirmed_at: DateTime.t() | nil,
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
         }
@@ -22,6 +23,7 @@ defmodule Chatbot.Accounts.User do
     field :email, :string
     field :hashed_password, :string
     field :password, :string, virtual: true, redact: true
+    field :confirmed_at, :utc_datetime
 
     has_many :conversations, Chatbot.Chat.Conversation
 

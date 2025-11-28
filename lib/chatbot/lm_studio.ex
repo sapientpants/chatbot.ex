@@ -88,10 +88,12 @@ defmodule Chatbot.LMStudio do
           {:ok, models}
 
         {:ok, %{status: status}} ->
-          {:error, "Unexpected status: #{status}"}
+          Logger.warning("LM Studio models request failed with status #{status}")
+          {:error, "Failed to load models. Please check if LM Studio is running."}
 
         {:error, exception} ->
-          {:error, Exception.message(exception)}
+          Logger.warning("LM Studio models request error: #{Exception.message(exception)}")
+          {:error, "Failed to connect to LM Studio. Please check if it is running."}
       end
     end)
   end
@@ -180,8 +182,10 @@ defmodule Chatbot.LMStudio do
       e ->
         # Record failure in circuit breaker
         :fuse.melt(@fuse_name)
-        send(pid, {:error, Exception.message(e)})
-        {:error, Exception.message(e)}
+        Logger.warning("LM Studio streaming error: #{Exception.message(e)}")
+        error_msg = "Failed to get AI response. Please try again."
+        send(pid, {:error, error_msg})
+        {:error, error_msg}
     end
   end
 
@@ -231,10 +235,15 @@ defmodule Chatbot.LMStudio do
           {:ok, response}
 
         {:ok, %{status: status, body: body}} ->
-          {:error, "Status #{status}: #{inspect(body)}"}
+          Logger.warning(
+            "LM Studio chat completion failed: status=#{status}, body=#{inspect(body)}"
+          )
+
+          {:error, "Failed to get AI response. Please try again."}
 
         {:error, exception} ->
-          {:error, Exception.message(exception)}
+          Logger.warning("LM Studio chat completion error: #{Exception.message(exception)}")
+          {:error, "Failed to connect to LM Studio. Please check if it is running."}
       end
     end)
   end

@@ -137,11 +137,12 @@ defmodule ChatbotWeb.ChatLive.Show do
     messages = Chat.list_messages(conversation.id)
 
     markdown_content = export_as_markdown(conversation, messages)
+    filename = sanitize_filename(conversation.title)
 
     # Send the markdown as a download
     {:noreply,
      push_event(socket, "download", %{
-       filename: "#{conversation.title || "conversation"}.md",
+       filename: "#{filename}.md",
        content: markdown_content
      })}
   end
@@ -151,6 +152,7 @@ defmodule ChatbotWeb.ChatLive.Show do
     conversation = socket.assigns.current_conversation
     # Reload messages from database for export (streams don't store list)
     messages = Chat.list_messages(conversation.id)
+    filename = sanitize_filename(conversation.title)
 
     json_content =
       Jason.encode!(
@@ -173,9 +175,23 @@ defmodule ChatbotWeb.ChatLive.Show do
 
     {:noreply,
      push_event(socket, "download", %{
-       filename: "#{conversation.title || "conversation"}.json",
+       filename: "#{filename}.json",
        content: json_content
      })}
+  end
+
+  # Sanitize filename to prevent XSS/injection attacks
+  defp sanitize_filename(nil), do: "conversation"
+  defp sanitize_filename(""), do: "conversation"
+
+  defp sanitize_filename(name) do
+    sanitized =
+      name
+      |> String.slice(0, 50)
+      |> String.replace(~r/[^\w\s-]/, "")
+      |> String.trim()
+
+    if sanitized == "", do: "conversation", else: sanitized
   end
 
   defp export_as_markdown(conversation, messages) do

@@ -7,6 +7,7 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   - Handling streaming chunks from AI responses
   - Managing streaming state and completion
   - Error handling for streaming failures
+  - Per-user concurrent task limiting
   """
 
   import Phoenix.LiveView
@@ -16,6 +17,86 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   alias Chatbot.LMStudio
   alias Chatbot.ModelCache
   alias ChatbotWeb.Plugs.RateLimiter
+
+  require Logger
+
+  # Maximum concurrent streaming tasks per user
+  @max_concurrent_tasks 3
+  @task_registry_table :streaming_tasks
+
+  @doc """
+  Ensures the task registry ETS table exists.
+  Called lazily when needed.
+  """
+  @spec ensure_task_registry() :: :ok
+  def ensure_task_registry do
+    case :ets.whereis(@task_registry_table) do
+      :undefined ->
+        :ets.new(@task_registry_table, [:set, :public, :named_table])
+        :ok
+
+      _ref ->
+        :ok
+    end
+  end
+
+  @doc """
+  Checks if the user can start a new streaming task (within concurrent limit).
+  """
+  @spec can_start_task?(binary()) :: boolean()
+  def can_start_task?(user_id) do
+    ensure_task_registry()
+    count = get_task_count(user_id)
+    count < @max_concurrent_tasks
+  end
+
+  @doc """
+  Registers a new streaming task for a user.
+  """
+  @spec register_task(binary(), pid()) :: :ok
+  def register_task(user_id, task_pid) do
+    ensure_task_registry()
+    key = {user_id, task_pid}
+    :ets.insert(@task_registry_table, {key, System.monotonic_time(:millisecond)})
+    :ok
+  end
+
+  @doc """
+  Unregisters a streaming task when it completes.
+  """
+  @spec unregister_task(binary(), pid()) :: :ok
+  def unregister_task(user_id, task_pid) do
+    ensure_task_registry()
+    key = {user_id, task_pid}
+    :ets.delete(@task_registry_table, key)
+    :ok
+  end
+
+  @doc """
+  Gets the count of active tasks for a user.
+  """
+  @spec get_task_count(binary()) :: non_neg_integer()
+  def get_task_count(user_id) do
+    ensure_task_registry()
+
+    # Count all entries where the first element of the key matches the user_id
+    counter = fn
+      {{uid, _pid}, _time}, acc when uid == user_id -> acc + 1
+      _entry, acc -> acc
+    end
+
+    :ets.foldl(counter, 0, @task_registry_table)
+  end
+
+  # Helper to unregister a streaming task if one is active
+  defp maybe_unregister_streaming_task(socket) do
+    user_id = socket.assigns.current_user.id
+    task_pid = socket.assigns[:streaming_task_pid]
+
+    if task_pid do
+      unregister_task(user_id, task_pid)
+    end
+  end
 
   # Helper to update a conversation in the local list without database reload
   defp update_conversation_in_list(conversations, updated_conversation) do
@@ -72,6 +153,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   """
   @spec handle_done(Phoenix.LiveView.Socket.t()) :: {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_done(socket) do
+    maybe_unregister_streaming_task(socket)
+
     conversation_id = socket.assigns.current_conversation.id
     chunks = socket.assigns[:streaming_chunks] || []
     # Chunks are stored in reverse order, so reverse before combining
@@ -121,6 +204,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   @spec handle_streaming_error(String.t(), Phoenix.LiveView.Socket.t()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_streaming_error(error_msg, socket) do
+    maybe_unregister_streaming_task(socket)
+
     {:noreply,
      socket
      |> put_flash(:error, "Error: #{error_msg}")
@@ -140,13 +225,23 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
     else
       user_id = socket.assigns.current_user.id
 
-      # Check rate limit before processing
-      case RateLimiter.check_message_rate_limit(user_id) do
-        :ok ->
-          process_message(content, socket)
+      # Check concurrent task limit first
+      if can_start_task?(user_id) do
+        # Check rate limit before processing
+        case RateLimiter.check_message_rate_limit(user_id) do
+          :ok ->
+            process_message(content, socket)
 
-        {:error, message} ->
-          {:noreply, put_flash(socket, :error, message)}
+          {:error, message} ->
+            {:noreply, put_flash(socket, :error, message)}
+        end
+      else
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "Too many active requests. Please wait for current responses to complete."
+         )}
       end
     end
   end
@@ -180,22 +275,34 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
         # Capture LiveView PID before starting Task and monitor it
         liveview_pid = self()
 
-        {:ok, task_pid} =
-          Task.Supervisor.start_child(Chatbot.TaskSupervisor, fn ->
-            LMStudio.stream_chat_completion(openai_messages, model, liveview_pid)
-          end)
+        case Task.Supervisor.start_child(Chatbot.TaskSupervisor, fn ->
+               LMStudio.stream_chat_completion(openai_messages, model, liveview_pid)
+             end) do
+          {:ok, task_pid} ->
+            # Register the task for concurrent limit tracking
+            register_task(user_id, task_pid)
 
-        # Monitor the task to handle crashes
-        Process.monitor(task_pid)
+            # Monitor the task to handle crashes
+            Process.monitor(task_pid)
 
-        {:noreply,
-         socket
-         |> stream_insert(:messages, user_message, at: -1)
-         |> assign(:has_messages, true)
-         |> assign(:streaming_chunks, [])
-         |> assign(:streaming_task_pid, task_pid)
-         |> assign(:is_streaming, true)
-         |> assign(:form, to_form(%{"content" => ""}, as: :message))}
+            {:noreply,
+             socket
+             |> stream_insert(:messages, user_message, at: -1)
+             |> assign(:has_messages, true)
+             |> assign(:streaming_chunks, [])
+             |> assign(:streaming_task_pid, task_pid)
+             |> assign(:is_streaming, true)
+             |> assign(:form, to_form(%{"content" => ""}, as: :message))}
+
+          {:error, reason} ->
+            Logger.error("Failed to start streaming task: #{inspect(reason)}")
+
+            {:noreply,
+             socket
+             |> stream_insert(:messages, user_message, at: -1)
+             |> put_flash(:error, "Failed to start AI response. Please try again.")
+             |> assign(:form, to_form(%{"content" => ""}, as: :message))}
+        end
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Failed to save message")}
@@ -307,15 +414,16 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   @spec handle_task_down(atom() | term(), Phoenix.LiveView.Socket.t()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_task_down(:normal, socket) do
-    # Task completed normally, nothing to do
+    # Task completed normally, unregister is handled in handle_done
     {:noreply, socket}
   end
 
-  def handle_task_down(reason, socket) do
-    # Task crashed, show error
+  def handle_task_down(_reason, socket) do
+    maybe_unregister_streaming_task(socket)
+
     {:noreply,
      socket
-     |> put_flash(:error, "Streaming failed: #{inspect(reason)}")
+     |> put_flash(:error, "Streaming failed unexpectedly. Please try again.")
      |> assign(:is_streaming, false)
      |> assign(:streaming_chunks, [])}
   end
