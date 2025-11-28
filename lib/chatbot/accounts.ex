@@ -342,6 +342,8 @@ defmodule Chatbot.Accounts do
     end
   end
 
+  # Dialyzer has issues with Ecto.Multi's opaque types in pipelines
+  @dialyzer {:nowarn_function, confirm_user_multi: 1}
   defp confirm_user_multi(user) do
     Ecto.Multi.new()
     |> Ecto.Multi.update(:user, User.confirm_changeset(user))
