@@ -8,6 +8,7 @@ defmodule Chatbot.Accounts do
   alias Chatbot.Accounts.User
   alias Chatbot.Accounts.UserNotifier
   alias Chatbot.Accounts.UserToken
+  alias Chatbot.PII
   alias Chatbot.Repo
 
   require Logger
@@ -191,7 +192,7 @@ defmodule Chatbot.Accounts do
     ==============================
     Password Reset Instructions
     ==============================
-    Hi #{user.email},
+    Hi #{PII.mask_email(user.email)},
 
     You can reset your password by visiting the URL below:
 

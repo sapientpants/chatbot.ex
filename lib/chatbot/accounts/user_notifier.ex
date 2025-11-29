@@ -6,6 +6,8 @@ defmodule Chatbot.Accounts.UserNotifier do
   In production, you would use Swoosh or another email library.
   """
 
+  alias Chatbot.PII
+
   require Logger
 
   @doc """
@@ -23,7 +25,7 @@ defmodule Chatbot.Accounts.UserNotifier do
     ==============================
     Email Confirmation Instructions
     ==============================
-    Hi #{user.email},
+    Hi #{PII.mask_email(user.email)},
 
     You can confirm your account by visiting the URL below:
 
@@ -53,7 +55,7 @@ defmodule Chatbot.Accounts.UserNotifier do
     ==============================
     Password Reset Instructions
     ==============================
-    Hi #{user.email},
+    Hi #{PII.mask_email(user.email)},
 
     You can reset your password by visiting the URL below:
 
