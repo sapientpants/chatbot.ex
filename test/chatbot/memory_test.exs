@@ -2,8 +2,8 @@ defmodule Chatbot.MemoryTest do
   use Chatbot.DataCase, async: true
 
   alias Chatbot.Memory
-  alias Chatbot.Memory.UserMemory
   alias Chatbot.Memory.ConversationSummary
+  alias Chatbot.Memory.UserMemory
 
   import Chatbot.Fixtures
 

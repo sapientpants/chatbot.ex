@@ -160,9 +160,16 @@ That's all I found.|
       user: user,
       message: message
     } do
-      # Configure to use mock
-      original = Application.get_env(:chatbot, :lm_studio_client)
+      # Configure to use mocks
+      original_lm = Application.get_env(:chatbot, :lm_studio_client)
+      original_ollama = Application.get_env(:chatbot, :ollama_client)
       Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+      Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
+
+      # Mock Ollama for embedding generation
+      embedding = List.duplicate(0.1, 1024)
+      stub(Chatbot.OllamaMock, :embed, fn _text -> {:ok, embedding} end)
+      stub(Chatbot.OllamaMock, :embedding_dimension, fn -> 1024 end)
 
       # Mock LLM response with valid facts
       expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
@@ -196,9 +203,13 @@ That's all I found.|
       assert hd(memories).content == "User prefers dark mode"
 
       # Restore config
-      if original,
-        do: Application.put_env(:chatbot, :lm_studio_client, original),
+      if original_lm,
+        do: Application.put_env(:chatbot, :lm_studio_client, original_lm),
         else: Application.delete_env(:chatbot, :lm_studio_client)
+
+      if original_ollama,
+        do: Application.put_env(:chatbot, :ollama_client, original_ollama),
+        else: Application.delete_env(:chatbot, :ollama_client)
     end
 
     test "returns :ok when LLM returns empty facts array", %{user: user, message: message} do
@@ -313,8 +324,15 @@ That's all I found.|
     end
 
     test "filters low confidence facts", %{user: user, message: message} do
-      original = Application.get_env(:chatbot, :lm_studio_client)
+      original_lm = Application.get_env(:chatbot, :lm_studio_client)
+      original_ollama = Application.get_env(:chatbot, :ollama_client)
       Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+      Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
+
+      # Mock Ollama for embedding generation
+      embedding = List.duplicate(0.1, 1024)
+      stub(Chatbot.OllamaMock, :embed, fn _text -> {:ok, embedding} end)
+      stub(Chatbot.OllamaMock, :embedding_dimension, fn -> 1024 end)
 
       expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
         {:ok,
@@ -348,9 +366,13 @@ That's all I found.|
       assert length(memories) == 1
       assert hd(memories).content == "High confidence fact"
 
-      if original,
-        do: Application.put_env(:chatbot, :lm_studio_client, original),
+      if original_lm,
+        do: Application.put_env(:chatbot, :lm_studio_client, original_lm),
         else: Application.delete_env(:chatbot, :lm_studio_client)
+
+      if original_ollama,
+        do: Application.put_env(:chatbot, :ollama_client, original_ollama),
+        else: Application.delete_env(:chatbot, :ollama_client)
     end
 
     test "skips duplicate facts based on similarity", %{user: user, message: message} do
@@ -359,11 +381,11 @@ That's all I found.|
       Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
       Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
 
-      # First, create an existing memory
+      # First, create an existing memory using create_memory_without_embedding
       embedding = List.duplicate(0.1, 1024)
 
       {:ok, _memory} =
-        Memory.create_memory(%{
+        Memory.create_memory_without_embedding(%{
           user_id: user.id,
           content: "User prefers dark mode",
           category: "preference",
@@ -372,7 +394,7 @@ That's all I found.|
           source_message_id: message.id
         })
 
-      # Mock embedding for similarity search
+      # Mock embedding for similarity search and fact storage
       stub(Chatbot.OllamaMock, :embed, fn _text -> {:ok, embedding} end)
       stub(Chatbot.OllamaMock, :embedding_dimension, fn -> 1024 end)
 

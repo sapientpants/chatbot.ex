@@ -163,8 +163,10 @@ defmodule Chatbot.Memory.EmbeddingCache do
 
   defp evict_oldest(count) do
     # Get all entries sorted by timestamp (oldest first)
+    all_entries = :ets.tab2list(@table_name)
+
     entries =
-      :ets.tab2list(@table_name)
+      all_entries
       |> Enum.sort_by(fn {_key, _embedding, timestamp} -> timestamp end)
       |> Enum.take(count)
 

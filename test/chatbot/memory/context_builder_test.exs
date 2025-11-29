@@ -215,11 +215,11 @@ defmodule Chatbot.Memory.ContextBuilderTest do
     end
 
     test "includes memories in context when found", %{user: user} do
-      # Create test memories with embeddings
+      # Create test memories with embeddings using create_memory_without_embedding
       embedding = List.duplicate(0.1, 1024)
 
       {:ok, _memory} =
-        Memory.create_memory(%{
+        Memory.create_memory_without_embedding(%{
           user_id: user.id,
           content: "User prefers dark mode",
           category: "preference",
@@ -241,7 +241,7 @@ defmodule Chatbot.Memory.ContextBuilderTest do
     test "formats different memory categories", %{user: user} do
       embedding = List.duplicate(0.1, 1024)
 
-      # Create memories with different categories
+      # Create memories with different categories using create_memory_without_embedding
       for {content, category} <- [
             {"User is a software developer", "skill"},
             {"User is named John", "personal_info"},
@@ -249,7 +249,7 @@ defmodule Chatbot.Memory.ContextBuilderTest do
             {"User mentioned meeting next week", "context"}
           ] do
         {:ok, _memory} =
-          Memory.create_memory(%{
+          Memory.create_memory_without_embedding(%{
             user_id: user.id,
             content: content,
             category: category,
@@ -308,7 +308,7 @@ defmodule Chatbot.Memory.ContextBuilderTest do
       embedding = List.duplicate(0.1, 1024)
 
       {:ok, _memory} =
-        Memory.create_memory(%{
+        Memory.create_memory_without_embedding(%{
           user_id: user.id,
           content: "User likes Elixir",
           category: "preference",

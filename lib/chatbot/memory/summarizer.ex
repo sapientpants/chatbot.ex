@@ -12,11 +12,11 @@ defmodule Chatbot.Memory.Summarizer do
   - Summaries are generated incrementally as conversations grow
   """
 
-  require Logger
-
   alias Chatbot.Chat
-  alias Chatbot.Memory
   alias Chatbot.LMStudio
+  alias Chatbot.Memory
+
+  require Logger
 
   @summarization_prompt """
   Summarize this conversation segment concisely, preserving:
@@ -96,9 +96,7 @@ defmodule Chatbot.Memory.Summarizer do
     if end_index <= start_index do
       {:ok, nil}
     else
-      messages_to_summarize =
-        messages
-        |> Enum.slice(start_index, end_index - start_index)
+      messages_to_summarize = Enum.slice(messages, start_index, end_index - start_index)
 
       do_generate_summary(conversation_id, messages_to_summarize, start_index, end_index, model)
     end
@@ -156,11 +154,7 @@ defmodule Chatbot.Memory.Summarizer do
         nil
 
       summaries ->
-        combined =
-          summaries
-          |> Enum.map(& &1.content)
-          |> Enum.join("\n\n")
-
+        combined = Enum.map_join(summaries, "\n\n", & &1.content)
         "Previous conversation context:\n" <> combined
     end
   end
@@ -168,12 +162,10 @@ defmodule Chatbot.Memory.Summarizer do
   # Private functions
 
   defp format_messages_for_summary(messages) do
-    messages
-    |> Enum.map(fn msg ->
+    Enum.map_join(messages, "\n\n", fn msg ->
       role = String.capitalize(msg.role)
       "#{role}: #{msg.content}"
     end)
-    |> Enum.join("\n\n")
   end
 
   defp estimate_tokens(text) when is_binary(text) do

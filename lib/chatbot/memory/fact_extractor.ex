@@ -15,11 +15,11 @@ defmodule Chatbot.Memory.FactExtractor do
   - `context` - Important context that should be remembered
   """
 
-  require Logger
-
+  alias Chatbot.LMStudio
   alias Chatbot.Memory
   alias Chatbot.Memory.Search
-  alias Chatbot.LMStudio
+
+  require Logger
 
   @extraction_prompt """
   Analyze this conversation exchange and extract any facts about the user that should be remembered for future conversations.
@@ -129,12 +129,7 @@ defmodule Chatbot.Memory.FactExtractor do
 
     case Jason.decode(json_str) do
       {:ok, facts} when is_list(facts) ->
-        parsed =
-          facts
-          |> Enum.filter(&valid_fact?/1)
-          |> Enum.map(&normalize_fact/1)
-
-        {:ok, parsed}
+        {:ok, parse_facts(facts)}
 
       {:ok, _other} ->
         {:error, :invalid_json}
@@ -145,12 +140,7 @@ defmodule Chatbot.Memory.FactExtractor do
           [json] ->
             case Jason.decode(json) do
               {:ok, facts} when is_list(facts) ->
-                parsed =
-                  facts
-                  |> Enum.filter(&valid_fact?/1)
-                  |> Enum.map(&normalize_fact/1)
-
-                {:ok, parsed}
+                {:ok, parse_facts(facts)}
 
               _other ->
                 {:error, :invalid_json}
@@ -160,6 +150,12 @@ defmodule Chatbot.Memory.FactExtractor do
             {:error, :invalid_json}
         end
     end
+  end
+
+  defp parse_facts(facts) do
+    facts
+    |> Enum.filter(&valid_fact?/1)
+    |> Enum.map(&normalize_fact/1)
   end
 
   # Private functions

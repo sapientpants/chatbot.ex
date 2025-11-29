@@ -17,10 +17,10 @@ defmodule Chatbot.Memory.Search do
   import Ecto.Query
   import Pgvector.Ecto.Query
 
-  alias Chatbot.Repo
-  alias Chatbot.Memory.UserMemory
   alias Chatbot.Memory.EmbeddingCache
+  alias Chatbot.Memory.UserMemory
   alias Chatbot.Ollama
+  alias Chatbot.Repo
 
   @rrf_k 60
 
@@ -162,20 +162,20 @@ defmodule Chatbot.Memory.Search do
   @spec rrf_fusion([map()], [map()], float(), float()) :: [binary()]
   def rrf_fusion(semantic_results, keyword_results, semantic_weight \\ 0.6, keyword_weight \\ 0.4) do
     # Build score map
-    scores =
+    semantic_scores =
       Enum.reduce(semantic_results, %{}, fn %{id: id, rank: rank}, acc ->
         score = semantic_weight / (@rrf_k + rank)
         Map.update(acc, id, score, &(&1 + score))
       end)
 
-    scores =
-      Enum.reduce(keyword_results, scores, fn %{id: id, rank: rank}, acc ->
+    combined_scores =
+      Enum.reduce(keyword_results, semantic_scores, fn %{id: id, rank: rank}, acc ->
         score = keyword_weight / (@rrf_k + rank)
         Map.update(acc, id, score, &(&1 + score))
       end)
 
     # Sort by score descending and return IDs
-    scores
+    combined_scores
     |> Enum.sort_by(fn {_id, score} -> score end, :desc)
     |> Enum.map(fn {id, _score} -> id end)
   end
@@ -183,13 +183,19 @@ defmodule Chatbot.Memory.Search do
   # Private functions
 
   defp get_query_embedding(text) do
-    EmbeddingCache.get_or_compute(text, fn t ->
-      Ollama.embed(t)
-    end)
-    |> case do
+    result =
+      EmbeddingCache.get_or_compute(text, fn t ->
+        ollama_client().embed(t)
+      end)
+
+    case result do
       {:ok, embedding} -> {:ok, Pgvector.new(embedding)}
       error -> error
     end
+  end
+
+  defp ollama_client do
+    Application.get_env(:chatbot, :ollama_client, Ollama)
   end
 
   defp build_tsquery(text) do
@@ -214,14 +220,16 @@ defmodule Chatbot.Memory.Search do
 
     # Reorder to match the fused order
     memory_map = Map.new(memories, fn m -> {m.id, m} end)
-    Enum.map(ids_to_fetch, fn id -> Map.get(memory_map, id) end) |> Enum.reject(&is_nil/1)
+
+    ids_to_fetch
+    |> Enum.map(fn id -> Map.get(memory_map, id) end)
+    |> Enum.reject(&is_nil/1)
   end
 
   defp maybe_filter_category(query, nil), do: query
   defp maybe_filter_category(query, category), do: where(query, [m], m.category == ^category)
 
   defp config(key, default) do
-    Application.get_env(:chatbot, :memory, [])
-    |> Keyword.get(key, default)
+    Keyword.get(Application.get_env(:chatbot, :memory, []), key, default)
   end
 end

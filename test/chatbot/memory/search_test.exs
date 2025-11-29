@@ -87,7 +87,7 @@ defmodule Chatbot.Memory.SearchTest do
 
     test "semantic_search/3 returns empty when no memories", %{user: user} do
       # Create a fake embedding vector
-      embedding = List.duplicate(0.0, 1024) |> Pgvector.new()
+      embedding = Pgvector.new(List.duplicate(0.0, 1024))
 
       result = Search.semantic_search(user.id, embedding, limit: 5)
 
@@ -121,7 +121,7 @@ defmodule Chatbot.Memory.SearchTest do
       # Create memories with embeddings directly in DB (bypassing Ollama)
       embedding = List.duplicate(0.1, 1024)
 
-      {:ok, memory} =
+      changeset =
         Memory.UserMemory.changeset(%Memory.UserMemory{}, %{
           user_id: user.id,
           content: "User likes Elixir programming",
@@ -129,14 +129,15 @@ defmodule Chatbot.Memory.SearchTest do
           confidence: 0.9,
           embedding: embedding
         })
-        |> Chatbot.Repo.insert()
+
+      {:ok, memory} = Chatbot.Repo.insert(changeset)
 
       {:ok, user: user, memory: memory}
     end
 
     test "finds memories by vector similarity", %{user: user, memory: memory} do
       # Query with similar embedding
-      query_embedding = List.duplicate(0.1, 1024) |> Pgvector.new()
+      query_embedding = Pgvector.new(List.duplicate(0.1, 1024))
 
       results = Search.semantic_search(user.id, query_embedding, limit: 5)
 
@@ -149,17 +150,19 @@ defmodule Chatbot.Memory.SearchTest do
       embedding = List.duplicate(0.1, 1024)
 
       for i <- 1..5 do
-        Memory.UserMemory.changeset(%Memory.UserMemory{}, %{
-          user_id: user.id,
-          content: "Memory #{i}",
-          category: "context",
-          confidence: 0.8,
-          embedding: embedding
-        })
-        |> Chatbot.Repo.insert()
+        changeset =
+          Memory.UserMemory.changeset(%Memory.UserMemory{}, %{
+            user_id: user.id,
+            content: "Memory #{i}",
+            category: "context",
+            confidence: 0.8,
+            embedding: embedding
+          })
+
+        Chatbot.Repo.insert(changeset)
       end
 
-      query_embedding = List.duplicate(0.1, 1024) |> Pgvector.new()
+      query_embedding = Pgvector.new(List.duplicate(0.1, 1024))
 
       results = Search.semantic_search(user.id, query_embedding, limit: 3)
 
@@ -170,16 +173,18 @@ defmodule Chatbot.Memory.SearchTest do
       embedding = List.duplicate(0.1, 1024)
 
       # Low confidence memory
-      Memory.UserMemory.changeset(%Memory.UserMemory{}, %{
-        user_id: user.id,
-        content: "Low confidence",
-        category: "context",
-        confidence: 0.2,
-        embedding: embedding
-      })
-      |> Chatbot.Repo.insert()
+      low_confidence_changeset =
+        Memory.UserMemory.changeset(%Memory.UserMemory{}, %{
+          user_id: user.id,
+          content: "Low confidence",
+          category: "context",
+          confidence: 0.2,
+          embedding: embedding
+        })
 
-      query_embedding = List.duplicate(0.1, 1024) |> Pgvector.new()
+      Chatbot.Repo.insert(low_confidence_changeset)
+
+      query_embedding = Pgvector.new(List.duplicate(0.1, 1024))
 
       # Should filter out low confidence
       results = Search.semantic_search(user.id, query_embedding, min_confidence: 0.5)
@@ -193,15 +198,17 @@ defmodule Chatbot.Memory.SearchTest do
     test "filters by category", %{user: user} do
       embedding = List.duplicate(0.1, 1024)
 
-      Memory.UserMemory.changeset(%Memory.UserMemory{}, %{
-        user_id: user.id,
-        content: "A preference",
-        category: "preference",
-        embedding: embedding
-      })
-      |> Chatbot.Repo.insert()
+      preference_changeset =
+        Memory.UserMemory.changeset(%Memory.UserMemory{}, %{
+          user_id: user.id,
+          content: "A preference",
+          category: "preference",
+          embedding: embedding
+        })
 
-      query_embedding = List.duplicate(0.1, 1024) |> Pgvector.new()
+      Chatbot.Repo.insert(preference_changeset)
+
+      query_embedding = Pgvector.new(List.duplicate(0.1, 1024))
 
       results = Search.semantic_search(user.id, query_embedding, category: "preference")
 
@@ -216,14 +223,15 @@ defmodule Chatbot.Memory.SearchTest do
     setup do
       user = user_fixture()
 
-      {:ok, memory} =
+      changeset =
         Memory.UserMemory.changeset(%Memory.UserMemory{}, %{
           user_id: user.id,
           content: "User knows Elixir and Phoenix framework",
           category: "skill",
           confidence: 0.9
         })
-        |> Chatbot.Repo.insert()
+
+      {:ok, memory} = Chatbot.Repo.insert(changeset)
 
       {:ok, user: user, memory: memory}
     end
@@ -237,12 +245,14 @@ defmodule Chatbot.Memory.SearchTest do
 
     test "respects limit parameter", %{user: user} do
       for i <- 1..5 do
-        Memory.UserMemory.changeset(%Memory.UserMemory{}, %{
-          user_id: user.id,
-          content: "Elixir skill #{i}",
-          category: "skill"
-        })
-        |> Chatbot.Repo.insert()
+        changeset =
+          Memory.UserMemory.changeset(%Memory.UserMemory{}, %{
+            user_id: user.id,
+            content: "Elixir skill #{i}",
+            category: "skill"
+          })
+
+        Chatbot.Repo.insert(changeset)
       end
 
       results = Search.keyword_search(user.id, "Elixir", limit: 3)
@@ -252,12 +262,14 @@ defmodule Chatbot.Memory.SearchTest do
 
     test "ranks by relevance", %{user: user} do
       # Memory with multiple keyword matches should rank higher
-      Memory.UserMemory.changeset(%Memory.UserMemory{}, %{
-        user_id: user.id,
-        content: "Elixir Elixir Elixir programming",
-        category: "skill"
-      })
-      |> Chatbot.Repo.insert()
+      changeset =
+        Memory.UserMemory.changeset(%Memory.UserMemory{}, %{
+          user_id: user.id,
+          content: "Elixir Elixir Elixir programming",
+          category: "skill"
+        })
+
+      Chatbot.Repo.insert(changeset)
 
       results = Search.keyword_search(user.id, "Elixir programming", limit: 10)
 

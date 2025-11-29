@@ -106,11 +106,7 @@ defmodule Chatbot.Memory.ContextBuilder do
           ""
 
         {:ok, memories} ->
-          facts =
-            memories
-            |> Enum.map(&format_memory/1)
-            |> Enum.join("\n")
-
+          facts = Enum.map_join(memories, "\n", &format_memory/1)
           "\n\nRelevant information about this user:\n#{facts}"
 
         {:error, _reason} ->
@@ -227,7 +223,6 @@ defmodule Chatbot.Memory.ContextBuilder do
   end
 
   defp config(key, default) do
-    Application.get_env(:chatbot, :memory, [])
-    |> Keyword.get(key, default)
+    Keyword.get(Application.get_env(:chatbot, :memory, []), key, default)
   end
 end

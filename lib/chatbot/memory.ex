@@ -8,11 +8,11 @@ defmodule Chatbot.Memory do
   """
 
   import Ecto.Query, warn: false
-  alias Chatbot.Repo
 
-  alias Chatbot.Memory.UserMemory
   alias Chatbot.Memory.ConversationSummary
+  alias Chatbot.Memory.UserMemory
   alias Chatbot.Ollama
+  alias Chatbot.Repo
 
   # --- User Memories ---
 
@@ -210,7 +210,7 @@ defmodule Chatbot.Memory do
   """
   @spec touch_memories([binary()]) :: {non_neg_integer(), nil}
   def touch_memories(memory_ids) when is_list(memory_ids) and memory_ids != [] do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = DateTime.utc_now(:second)
 
     UserMemory
     |> where([m], m.id in ^memory_ids)
@@ -313,10 +313,14 @@ defmodule Chatbot.Memory do
   defp generate_embedding(""), do: {:error, "Content cannot be empty"}
 
   defp generate_embedding(content) when is_binary(content) do
-    case Ollama.embed(content) do
+    case ollama_client().embed(content) do
       {:ok, embedding} -> {:ok, Pgvector.new(embedding)}
       {:error, reason} -> {:error, reason}
     end
+  end
+
+  defp ollama_client do
+    Application.get_env(:chatbot, :ollama_client, Ollama)
   end
 
   @doc """

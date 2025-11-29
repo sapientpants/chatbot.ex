@@ -15,9 +15,9 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
 
   alias Chatbot.Chat
   alias Chatbot.LMStudio
-  alias Chatbot.ModelCache
   alias Chatbot.Memory.ContextBuilder
   alias Chatbot.Memory.FactExtractor
+  alias Chatbot.ModelCache
   alias ChatbotWeb.Plugs.RateLimiter
 
   require Logger
@@ -176,21 +176,7 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
           conversations = update_conversation_in_list(socket.assigns.conversations, updated_conv)
 
           # Trigger async fact extraction (fire and forget)
-          user_id = socket.assigns.current_user.id
-          user_message_content = socket.assigns[:last_user_message] || ""
-          model = socket.assigns.selected_model || "default"
-
-          if user_message_content != "" do
-            Task.Supervisor.start_child(Chatbot.TaskSupervisor, fn ->
-              FactExtractor.extract_and_store(
-                user_id,
-                user_message_content,
-                complete_message,
-                message.id,
-                model
-              )
-            end)
-          end
+          maybe_extract_facts(socket, complete_message, message.id)
 
           {:noreply,
            socket
@@ -445,5 +431,24 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
      |> put_flash(:error, "Streaming failed unexpectedly. Please try again.")
      |> assign(:is_streaming, false)
      |> assign(:streaming_chunks, [])}
+  end
+
+  # Extracts facts from the conversation asynchronously
+  defp maybe_extract_facts(socket, complete_message, message_id) do
+    user_id = socket.assigns.current_user.id
+    user_message_content = socket.assigns[:last_user_message] || ""
+    model = socket.assigns.selected_model || "default"
+
+    if user_message_content != "" do
+      Task.Supervisor.start_child(Chatbot.TaskSupervisor, fn ->
+        FactExtractor.extract_and_store(
+          user_id,
+          user_message_content,
+          complete_message,
+          message_id,
+          model
+        )
+      end)
+    end
   end
 end
