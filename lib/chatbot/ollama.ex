@@ -440,10 +440,10 @@ defmodule Chatbot.Ollama do
           send(pid, {:done, ""})
           {request, response}
 
-        {:error, reason} ->
-          Logger.warning("Finch stream error: #{inspect(reason)}")
+        {:error, exception, _accumulator} ->
+          Logger.warning("Finch stream error: #{inspect(exception)}")
           send(pid, {:error, "Failed to get AI response. Please try again."})
-          raise "Finch streaming failed: #{inspect(reason)}"
+          raise "Finch streaming failed: #{inspect(exception)}"
       end
     end
 
