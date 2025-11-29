@@ -20,7 +20,14 @@ defmodule Chatbot.Ollama do
   require Logger
 
   @fuse_name :ollama_fuse
-  @fuse_options {{:standard, 5, 60_000}, {:reset, 30_000}}
+
+  # Circuit breaker configuration:
+  # - Max 5 failures within 60 seconds opens the circuit
+  # - Circuit attempts reset after 30 seconds
+  @fuse_max_failures 5
+  @fuse_window_ms 60_000
+  @fuse_reset_ms 30_000
+  @fuse_options {{:standard, @fuse_max_failures, @fuse_window_ms}, {:reset, @fuse_reset_ms}}
 
   defp base_url do
     config()[:base_url] || "http://localhost:11434"
@@ -122,6 +129,10 @@ defmodule Chatbot.Ollama do
            ) do
         {:ok, %{status: 200, body: %{"embeddings" => [embedding | _rest]}}} ->
           {:ok, embedding}
+
+        {:ok, %{status: 200, body: %{"embeddings" => []}}} ->
+          Logger.warning("Ollama returned empty embeddings list")
+          {:error, "No embedding returned by Ollama for the given input."}
 
         {:ok, %{status: 200, body: %{"embedding" => embedding}}} ->
           # Fallback for older API format

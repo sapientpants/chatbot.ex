@@ -3,7 +3,8 @@ defmodule Chatbot.Memory.EmbeddingCache do
   ETS-based cache for query embeddings.
 
   Caches embeddings for search queries to avoid repeated Ollama API calls.
-  Uses LRU-style eviction when max cache size is reached.
+  Uses FIFO (time-based) eviction when max cache size is reached - oldest
+  entries by insertion time are evicted first.
   """
   use GenServer
 

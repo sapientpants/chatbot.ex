@@ -23,6 +23,16 @@ defmodule Chatbot.Memory.ContextBuilder do
 
   @default_token_budget 4000
 
+  # Token estimation constants:
+  # - Approximate 4 characters per token for English text
+  # - 10% buffer for encoding overhead and tokenization variance
+  # - 10 tokens per message for role/formatting overhead
+  # - 100 token buffer subtracted from budget for response generation
+  @chars_per_token 4
+  @token_estimate_buffer 1.1
+  @message_overhead_tokens 10
+  @response_buffer_tokens 100
+
   @base_system_prompt """
   You are a helpful AI assistant. Be concise, accurate, and helpful.
   """
@@ -55,7 +65,7 @@ defmodule Chatbot.Memory.ContextBuilder do
       ]}
 
   """
-  @spec build_context(binary(), binary(), keyword()) :: {:ok, [map()]} | {:error, term()}
+  @spec build_context(binary(), binary(), keyword()) :: {:ok, [map()]}
   def build_context(conversation_id, user_id, opts \\ []) do
     current_query = Keyword.get(opts, :current_query, "")
     custom_system_prompt = Keyword.get(opts, :system_prompt)
@@ -71,7 +81,7 @@ defmodule Chatbot.Memory.ContextBuilder do
     summary_tokens = if summary_context, do: estimate_tokens(summary_context), else: 0
 
     # Calculate remaining budget for messages
-    remaining_budget = token_budget - system_tokens - summary_tokens - 100
+    remaining_budget = token_budget - system_tokens - summary_tokens - @response_buffer_tokens
 
     # Get messages with sliding window
     messages = Chat.list_messages(conversation_id)
@@ -140,8 +150,7 @@ defmodule Chatbot.Memory.ContextBuilder do
     messages
     |> Enum.reverse()
     |> Enum.reduce_while({[], 0}, fn msg, {acc, tokens} ->
-      # +10 for role/formatting
-      msg_tokens = estimate_tokens(msg.content) + 10
+      msg_tokens = estimate_tokens(msg.content) + @message_overhead_tokens
 
       if tokens + msg_tokens <= budget do
         {:cont, {[msg | acc], tokens + msg_tokens}}
@@ -161,8 +170,7 @@ defmodule Chatbot.Memory.ContextBuilder do
   def estimate_tokens(nil), do: 0
 
   def estimate_tokens(text) when is_binary(text) do
-    # Approximate: 1 token ~= 4 characters, with 10% buffer
-    trunc(String.length(text) / 4 * 1.1)
+    trunc(String.length(text) / @chars_per_token * @token_estimate_buffer)
   end
 
   # Private functions

@@ -21,6 +21,13 @@ defmodule Chatbot.Memory.FactExtractor do
 
   require Logger
 
+  # Minimum confidence score for storing a fact (0.0 to 1.0)
+  @min_fact_confidence 0.3
+
+  # Jaro distance threshold for detecting duplicate facts (0.0 to 1.0)
+  # Higher values require more similarity to consider a duplicate
+  @similarity_threshold 0.85
+
   @extraction_prompt """
   Analyze this conversation exchange and extract any facts about the user that should be remembered for future conversations.
 
@@ -190,7 +197,7 @@ defmodule Chatbot.Memory.FactExtractor do
     max_count = Memory.max_memories_per_user()
 
     facts
-    |> Enum.filter(fn fact -> fact.confidence >= 0.3 end)
+    |> Enum.filter(fn fact -> fact.confidence >= @min_fact_confidence end)
     |> Enum.take(max_count - current_count)
     |> Enum.each(fn fact ->
       # Check for duplicates using semantic search
@@ -213,7 +220,8 @@ defmodule Chatbot.Memory.FactExtractor do
       {:ok, [memory | _rest]} ->
         # Check if very similar (would need to compute similarity)
         # For now, do exact content check
-        String.jaro_distance(String.downcase(memory.content), String.downcase(content)) > 0.85
+        String.jaro_distance(String.downcase(memory.content), String.downcase(content)) >
+          @similarity_threshold
 
       _other ->
         false

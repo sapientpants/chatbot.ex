@@ -22,6 +22,8 @@ defmodule Chatbot.Memory.Search do
   alias Chatbot.Ollama
   alias Chatbot.Repo
 
+  # Reciprocal Rank Fusion (RRF) constant. Higher values reduce the impact of
+  # rank differences. 60 is the standard value from the original RRF paper.
   @rrf_k 60
 
   @doc """
