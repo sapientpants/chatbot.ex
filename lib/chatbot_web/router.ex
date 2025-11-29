@@ -70,8 +70,9 @@ defmodule ChatbotWeb.Router do
     pipe_through :browser
 
     live_session :email_confirmation do
-      live "/confirm/:token", ConfirmationLive
+      # Order matters: specific route before parameterized route
       live "/confirm/resend", ConfirmationInstructionsLive
+      live "/confirm/:token", ConfirmationLive
     end
   end
 
