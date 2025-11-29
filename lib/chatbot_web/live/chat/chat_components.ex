@@ -108,6 +108,14 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
             <div class="text-sm font-medium truncate">{@current_user.email}</div>
           </div>
           <.link
+            navigate={~p"/settings"}
+            class="btn btn-ghost btn-sm btn-square hover:bg-base-300"
+            aria-label="Settings"
+            title="Provider settings"
+          >
+            <.icon name="hero-cog-6-tooth" class="w-5 h-5" />
+          </.link>
+          <.link
             href={~p"/logout"}
             method="delete"
             class="btn btn-ghost btn-sm btn-square hover:bg-base-300"

@@ -27,12 +27,13 @@ config :chatbot, :lm_studio,
 # Model cache configuration
 config :chatbot, :model_cache, ttl_ms: 60_000
 
-# Ollama configuration (for embeddings)
+# Ollama configuration (for embeddings and chat completions)
 config :chatbot, :ollama,
   base_url: "http://localhost:11434",
   embedding_model: "qwen3-embedding:0.6b",
   embedding_dimension: 1024,
-  timeout_ms: 30_000
+  timeout_ms: 30_000,
+  stream_timeout_ms: 300_000
 
 # Memory system configuration
 config :chatbot, :memory,

@@ -15,9 +15,9 @@ defmodule Chatbot.Memory.FactExtractor do
   - `context` - Important context that should be remembered
   """
 
-  alias Chatbot.LMStudio
   alias Chatbot.Memory
   alias Chatbot.Memory.Search
+  alias Chatbot.ProviderRouter
 
   require Logger
 
@@ -93,7 +93,7 @@ defmodule Chatbot.Memory.FactExtractor do
       %{role: "user", content: prompt}
     ]
 
-    case lm_studio_client().chat_completion(messages, model) do
+    case ProviderRouter.chat_completion(messages, model) do
       {:ok, %{"choices" => [%{"message" => %{"content" => response}} | _rest]}} ->
         process_extraction_response(response, user_id, source_message_id)
 
@@ -249,9 +249,5 @@ defmodule Chatbot.Memory.FactExtractor do
 
   defp extraction_enabled? do
     Application.get_env(:chatbot, :memory, [])[:fact_extraction_enabled] != false
-  end
-
-  defp lm_studio_client do
-    Application.get_env(:chatbot, :lm_studio_client, LMStudio)
   end
 end

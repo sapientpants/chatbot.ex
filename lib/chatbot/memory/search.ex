@@ -19,7 +19,7 @@ defmodule Chatbot.Memory.Search do
 
   alias Chatbot.Memory.EmbeddingCache
   alias Chatbot.Memory.UserMemory
-  alias Chatbot.Ollama
+  alias Chatbot.ProviderRouter
   alias Chatbot.Repo
 
   # Reciprocal Rank Fusion (RRF) constant. Higher values reduce the impact of
@@ -187,17 +187,13 @@ defmodule Chatbot.Memory.Search do
   defp get_query_embedding(text) do
     result =
       EmbeddingCache.get_or_compute(text, fn t ->
-        ollama_client().embed(t)
+        ProviderRouter.embed(t)
       end)
 
     case result do
       {:ok, embedding} -> {:ok, Pgvector.new(embedding)}
       error -> error
     end
-  end
-
-  defp ollama_client do
-    Application.get_env(:chatbot, :ollama_client, Ollama)
   end
 
   defp build_tsquery(text) do

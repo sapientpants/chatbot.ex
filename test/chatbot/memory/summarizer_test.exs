@@ -141,10 +141,10 @@ defmodule Chatbot.Memory.SummarizerTest do
       conversation: conversation,
       messages: messages
     } do
-      original = Application.get_env(:chatbot, :lm_studio_client)
-      Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+      original = Application.get_env(:chatbot, :ollama_client)
+      Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
 
-      expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
+      expect(Chatbot.OllamaMock, :chat_completion, fn _messages, _model ->
         {:ok,
          %{
            "choices" => [
@@ -165,18 +165,18 @@ defmodule Chatbot.Memory.SummarizerTest do
       assert summary.message_range_start == 0
 
       if original,
-        do: Application.put_env(:chatbot, :lm_studio_client, original),
-        else: Application.delete_env(:chatbot, :lm_studio_client)
+        do: Application.put_env(:chatbot, :ollama_client, original),
+        else: Application.delete_env(:chatbot, :ollama_client)
     end
 
     test "handles LLM error gracefully", %{
       conversation: conversation,
       messages: messages
     } do
-      original = Application.get_env(:chatbot, :lm_studio_client)
-      Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+      original = Application.get_env(:chatbot, :ollama_client)
+      Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
 
-      expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
+      expect(Chatbot.OllamaMock, :chat_completion, fn _messages, _model ->
         {:error, "Connection refused"}
       end)
 
@@ -185,18 +185,18 @@ defmodule Chatbot.Memory.SummarizerTest do
       assert {:error, "Connection refused"} = result
 
       if original,
-        do: Application.put_env(:chatbot, :lm_studio_client, original),
-        else: Application.delete_env(:chatbot, :lm_studio_client)
+        do: Application.put_env(:chatbot, :ollama_client, original),
+        else: Application.delete_env(:chatbot, :ollama_client)
     end
 
     test "handles unexpected response format", %{
       conversation: conversation,
       messages: messages
     } do
-      original = Application.get_env(:chatbot, :lm_studio_client)
-      Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+      original = Application.get_env(:chatbot, :ollama_client)
+      Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
 
-      expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
+      expect(Chatbot.OllamaMock, :chat_completion, fn _messages, _model ->
         {:ok, %{"unexpected" => "format"}}
       end)
 
@@ -205,8 +205,8 @@ defmodule Chatbot.Memory.SummarizerTest do
       assert {:error, :unexpected_response} = result
 
       if original,
-        do: Application.put_env(:chatbot, :lm_studio_client, original),
-        else: Application.delete_env(:chatbot, :lm_studio_client)
+        do: Application.put_env(:chatbot, :ollama_client, original),
+        else: Application.delete_env(:chatbot, :ollama_client)
     end
   end
 
@@ -218,9 +218,9 @@ defmodule Chatbot.Memory.SummarizerTest do
     end
 
     test "generates summary when threshold is exceeded", %{conversation: conversation} do
-      original = Application.get_env(:chatbot, :lm_studio_client)
+      original = Application.get_env(:chatbot, :ollama_client)
       original_memory = Application.get_env(:chatbot, :memory, [])
-      Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+      Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
       # Set a low threshold for testing
       Application.put_env(
         :chatbot,
@@ -237,7 +237,7 @@ defmodule Chatbot.Memory.SummarizerTest do
         })
       end
 
-      expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
+      expect(Chatbot.OllamaMock, :chat_completion, fn _messages, _model ->
         {:ok,
          %{
            "choices" => [
@@ -258,8 +258,8 @@ defmodule Chatbot.Memory.SummarizerTest do
       Application.put_env(:chatbot, :memory, original_memory)
 
       if original,
-        do: Application.put_env(:chatbot, :lm_studio_client, original),
-        else: Application.delete_env(:chatbot, :lm_studio_client)
+        do: Application.put_env(:chatbot, :ollama_client, original),
+        else: Application.delete_env(:chatbot, :ollama_client)
     end
   end
 end

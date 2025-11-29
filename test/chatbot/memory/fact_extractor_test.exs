@@ -163,7 +163,7 @@ That's all I found.|
       # Configure to use mocks
       original_lm = Application.get_env(:chatbot, :lm_studio_client)
       original_ollama = Application.get_env(:chatbot, :ollama_client)
-      Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+      Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
       Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
 
       # Mock Ollama for embedding generation
@@ -172,7 +172,7 @@ That's all I found.|
       stub(Chatbot.OllamaMock, :embedding_dimension, fn -> 1024 end)
 
       # Mock LLM response with valid facts
-      expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
+      expect(Chatbot.OllamaMock, :chat_completion, fn _messages, _model ->
         {:ok,
          %{
            "choices" => [
@@ -205,7 +205,7 @@ That's all I found.|
       # Restore config
       if original_lm,
         do: Application.put_env(:chatbot, :lm_studio_client, original_lm),
-        else: Application.delete_env(:chatbot, :lm_studio_client)
+        else: Application.delete_env(:chatbot, :ollama_client)
 
       if original_ollama,
         do: Application.put_env(:chatbot, :ollama_client, original_ollama),
@@ -213,10 +213,10 @@ That's all I found.|
     end
 
     test "returns :ok when LLM returns empty facts array", %{user: user, message: message} do
-      original = Application.get_env(:chatbot, :lm_studio_client)
-      Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+      original = Application.get_env(:chatbot, :ollama_client)
+      Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
 
-      expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
+      expect(Chatbot.OllamaMock, :chat_completion, fn _messages, _model ->
         {:ok,
          %{
            "choices" => [
@@ -239,15 +239,15 @@ That's all I found.|
       assert result == :ok
 
       if original,
-        do: Application.put_env(:chatbot, :lm_studio_client, original),
-        else: Application.delete_env(:chatbot, :lm_studio_client)
+        do: Application.put_env(:chatbot, :ollama_client, original),
+        else: Application.delete_env(:chatbot, :ollama_client)
     end
 
     test "handles LLM error gracefully", %{user: user, message: message} do
-      original = Application.get_env(:chatbot, :lm_studio_client)
-      Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+      original = Application.get_env(:chatbot, :ollama_client)
+      Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
 
-      expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
+      expect(Chatbot.OllamaMock, :chat_completion, fn _messages, _model ->
         {:error, "Connection refused"}
       end)
 
@@ -263,15 +263,15 @@ That's all I found.|
       assert {:error, "Connection refused"} = result
 
       if original,
-        do: Application.put_env(:chatbot, :lm_studio_client, original),
-        else: Application.delete_env(:chatbot, :lm_studio_client)
+        do: Application.put_env(:chatbot, :ollama_client, original),
+        else: Application.delete_env(:chatbot, :ollama_client)
     end
 
     test "handles unexpected response format", %{user: user, message: message} do
-      original = Application.get_env(:chatbot, :lm_studio_client)
-      Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+      original = Application.get_env(:chatbot, :ollama_client)
+      Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
 
-      expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
+      expect(Chatbot.OllamaMock, :chat_completion, fn _messages, _model ->
         {:ok, %{"unexpected" => "format"}}
       end)
 
@@ -287,15 +287,15 @@ That's all I found.|
       assert {:error, :unexpected_response} = result
 
       if original,
-        do: Application.put_env(:chatbot, :lm_studio_client, original),
-        else: Application.delete_env(:chatbot, :lm_studio_client)
+        do: Application.put_env(:chatbot, :ollama_client, original),
+        else: Application.delete_env(:chatbot, :ollama_client)
     end
 
     test "handles invalid JSON from LLM gracefully", %{user: user, message: message} do
-      original = Application.get_env(:chatbot, :lm_studio_client)
-      Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+      original = Application.get_env(:chatbot, :ollama_client)
+      Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
 
-      expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
+      expect(Chatbot.OllamaMock, :chat_completion, fn _messages, _model ->
         {:ok,
          %{
            "choices" => [
@@ -319,14 +319,14 @@ That's all I found.|
       assert result == :ok
 
       if original,
-        do: Application.put_env(:chatbot, :lm_studio_client, original),
-        else: Application.delete_env(:chatbot, :lm_studio_client)
+        do: Application.put_env(:chatbot, :ollama_client, original),
+        else: Application.delete_env(:chatbot, :ollama_client)
     end
 
     test "filters low confidence facts", %{user: user, message: message} do
       original_lm = Application.get_env(:chatbot, :lm_studio_client)
       original_ollama = Application.get_env(:chatbot, :ollama_client)
-      Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+      Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
       Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
 
       # Mock Ollama for embedding generation
@@ -334,7 +334,7 @@ That's all I found.|
       stub(Chatbot.OllamaMock, :embed, fn _text -> {:ok, embedding} end)
       stub(Chatbot.OllamaMock, :embedding_dimension, fn -> 1024 end)
 
-      expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
+      expect(Chatbot.OllamaMock, :chat_completion, fn _messages, _model ->
         {:ok,
          %{
            "choices" => [
@@ -368,7 +368,7 @@ That's all I found.|
 
       if original_lm,
         do: Application.put_env(:chatbot, :lm_studio_client, original_lm),
-        else: Application.delete_env(:chatbot, :lm_studio_client)
+        else: Application.delete_env(:chatbot, :ollama_client)
 
       if original_ollama,
         do: Application.put_env(:chatbot, :ollama_client, original_ollama),
@@ -378,7 +378,7 @@ That's all I found.|
     test "skips duplicate facts based on similarity", %{user: user, message: message} do
       original_lm = Application.get_env(:chatbot, :lm_studio_client)
       original_ollama = Application.get_env(:chatbot, :ollama_client)
-      Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+      Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
       Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
 
       # First, create an existing memory using create_memory_without_embedding
@@ -399,7 +399,7 @@ That's all I found.|
       stub(Chatbot.OllamaMock, :embedding_dimension, fn -> 1024 end)
 
       # Try to extract a very similar fact
-      expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
+      expect(Chatbot.OllamaMock, :chat_completion, fn _messages, _model ->
         {:ok,
          %{
            "choices" => [
@@ -430,7 +430,7 @@ That's all I found.|
 
       if original_lm,
         do: Application.put_env(:chatbot, :lm_studio_client, original_lm),
-        else: Application.delete_env(:chatbot, :lm_studio_client)
+        else: Application.delete_env(:chatbot, :ollama_client)
 
       if original_ollama,
         do: Application.put_env(:chatbot, :ollama_client, original_ollama),

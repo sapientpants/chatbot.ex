@@ -22,6 +22,26 @@ defmodule Chatbot.LMStudio do
   @fuse_name :lm_studio_fuse
   @fuse_options {{:standard, 5, 60_000}, {:reset, 30_000}}
 
+  @doc """
+  Strips the provider prefix from a model name.
+
+  ## Examples
+
+      iex> strip_provider_prefix("lmstudio/mistral")
+      "mistral"
+
+      iex> strip_provider_prefix("mistral")
+      "mistral"
+
+  """
+  @spec strip_provider_prefix(String.t()) :: String.t()
+  def strip_provider_prefix(model) when is_binary(model) do
+    case String.split(model, "/", parts: 2) do
+      ["lmstudio", name] -> name
+      _other -> model
+    end
+  end
+
   defp base_url do
     config()[:base_url] || "http://localhost:1234/v1"
   end
@@ -128,8 +148,11 @@ defmodule Chatbot.LMStudio do
   end
 
   defp do_stream_chat_completion(messages, model, pid) do
+    # Strip provider prefix if present
+    model_name = strip_provider_prefix(model)
+
     body = %{
-      model: model,
+      model: model_name,
       messages: messages,
       stream: true,
       temperature: 0.7
@@ -224,8 +247,11 @@ defmodule Chatbot.LMStudio do
   @spec chat_completion(messages(), String.t()) :: {:ok, map()} | {:error, String.t()}
   def chat_completion(messages, model) do
     with_circuit_breaker(fn ->
+      # Strip provider prefix if present
+      model_name = strip_provider_prefix(model)
+
       body = %{
-        model: model,
+        model: model_name,
         messages: messages,
         temperature: 0.7
       }

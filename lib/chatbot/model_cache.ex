@@ -1,11 +1,16 @@
 defmodule Chatbot.ModelCache do
   @moduledoc """
-  ETS-based cache for LM Studio model list.
+  ETS-based cache for LLM provider model lists.
 
-  Caches the list of available models to avoid repeated API calls to LM Studio.
-  The cache has a configurable TTL (time-to-live) after which the models are refreshed.
+  Caches the list of available models from all enabled providers (Ollama, LM Studio)
+  to avoid repeated API calls. The cache has a configurable TTL (time-to-live)
+  after which the models are refreshed.
+
+  Models are returned with provider prefixes (e.g., `ollama/llama3`, `lmstudio/mistral`).
   """
   use GenServer
+
+  alias Chatbot.ProviderRouter
 
   require Logger
 
@@ -23,7 +28,7 @@ defmodule Chatbot.ModelCache do
   end
 
   @doc """
-  Gets the cached model list, fetching from LM Studio if needed.
+  Gets the cached model list, fetching from all enabled providers if needed.
   Returns {:ok, models} or {:error, reason}.
 
   Uses GenServer call to serialize cache misses and prevent thundering herd.
@@ -72,7 +77,7 @@ defmodule Chatbot.ModelCache do
         {:reply, {:ok, models}, state}
 
       :miss ->
-        result = lm_studio_client().list_models()
+        result = ProviderRouter.list_all_models()
 
         case result do
           {:ok, models} -> cache_models(models)
@@ -85,7 +90,7 @@ defmodule Chatbot.ModelCache do
 
   @impl GenServer
   def handle_cast(:refresh, state) do
-    case lm_studio_client().list_models() do
+    case ProviderRouter.list_all_models() do
       {:ok, models} ->
         cache_models(models)
 
@@ -103,10 +108,6 @@ defmodule Chatbot.ModelCache do
   end
 
   # Private functions
-
-  defp lm_studio_client do
-    Application.get_env(:chatbot, :lm_studio_client, Chatbot.LMStudio)
-  end
 
   defp lookup_models do
     ttl = Application.get_env(:chatbot, :model_cache, [])[:ttl_ms] || @default_ttl_ms

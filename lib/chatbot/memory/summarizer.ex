@@ -13,8 +13,8 @@ defmodule Chatbot.Memory.Summarizer do
   """
 
   alias Chatbot.Chat
-  alias Chatbot.LMStudio
   alias Chatbot.Memory
+  alias Chatbot.ProviderRouter
 
   require Logger
 
@@ -114,7 +114,7 @@ defmodule Chatbot.Memory.Summarizer do
       %{role: "user", content: prompt}
     ]
 
-    case lm_studio_client().chat_completion(llm_messages, model) do
+    case ProviderRouter.chat_completion(llm_messages, model) do
       {:ok, %{"choices" => [%{"message" => %{"content" => summary}} | _rest]}} ->
         Memory.create_summary(%{
           conversation_id: conversation_id,
@@ -175,9 +175,5 @@ defmodule Chatbot.Memory.Summarizer do
 
   defp summarization_threshold do
     Application.get_env(:chatbot, :memory, [])[:summarization_threshold] || 30
-  end
-
-  defp lm_studio_client do
-    Application.get_env(:chatbot, :lm_studio_client, LMStudio)
   end
 end
