@@ -37,6 +37,7 @@ defmodule ChatbotWeb.ChatLive.Show do
         |> assign(:current_conversation, conversation)
         |> stream(:messages, conversation.messages)
         |> assign(:streaming_chunks, [])
+        |> assign(:last_valid_html, nil)
         |> assign(:is_streaming, false)
         |> assign(:available_models, [])
         |> assign(:selected_model, conversation.model_name)
@@ -299,6 +300,7 @@ defmodule ChatbotWeb.ChatLive.Show do
           messages={@streams.messages}
           is_streaming={@is_streaming}
           streaming_chunks={@streaming_chunks}
+          last_valid_html={@last_valid_html}
         />
         <.message_input_form form={@form} is_streaming={@is_streaming} />
       </main>
