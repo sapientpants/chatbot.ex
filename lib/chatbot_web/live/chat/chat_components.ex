@@ -219,10 +219,11 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
         @message.role == "user" && "flex flex-col items-end"
       ]}>
         <div class={[
-          "inline-block rounded-2xl px-4 py-3 max-w-[85%]",
-          @message.role == "user" && "bg-primary text-primary-content rounded-br-md",
+          "rounded-2xl px-4 py-3",
+          @message.role == "user" &&
+            "inline-block max-w-[85%] bg-primary text-primary-content rounded-br-md",
           @message.role != "user" &&
-            "bg-base-200 rounded-bl-md border border-base-300 shadow-sm"
+            "w-[85%] bg-base-200 rounded-bl-md border border-base-300 shadow-sm"
         ]}>
           <.markdown content={@message.content} />
         </div>
@@ -248,7 +249,7 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
         <.icon name="hero-sparkles" class="w-4 h-4" />
       </div>
       <div class="flex-1 min-w-0">
-        <div class="inline-block rounded-2xl rounded-bl-md px-4 py-3 bg-base-200 border border-base-300 shadow-sm max-w-[85%]">
+        <div class="w-[85%] rounded-2xl rounded-bl-md px-4 py-3 bg-base-200 border border-base-300 shadow-sm">
           <%= if @streaming_chunks != [] do %>
             <.markdown content={@streaming_chunks |> Enum.reverse() |> IO.iodata_to_binary()} />
           <% end %>
