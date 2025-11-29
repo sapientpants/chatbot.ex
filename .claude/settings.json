@@ -2,11 +2,11 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash(git commit:*)",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "./.claude/hooks/block-git-no-verify.sh"
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-git-no-verify.sh"
           }
         ]
       }

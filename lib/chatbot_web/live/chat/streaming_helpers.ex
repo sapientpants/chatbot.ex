@@ -15,6 +15,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
 
   alias Chatbot.Chat
   alias Chatbot.LMStudio
+  alias Chatbot.Memory.ContextBuilder
+  alias Chatbot.Memory.FactExtractor
   alias Chatbot.ModelCache
   alias ChatbotWeb.Plugs.RateLimiter
 
@@ -173,6 +175,9 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
           updated_conv = %{current_conv | updated_at: DateTime.utc_now()}
           conversations = update_conversation_in_list(socket.assigns.conversations, updated_conv)
 
+          # Trigger async fact extraction (fire and forget)
+          maybe_extract_facts(socket, complete_message, message.id)
+
           {:noreply,
            socket
            |> stream_insert(:messages, message, at: -1)
@@ -180,6 +185,7 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
            |> assign(:conversations, conversations)
            |> assign(:is_streaming, false)
            |> assign(:streaming_chunks, [])
+           |> assign(:last_user_message, nil)
            |> assign(:form, to_form(%{"content" => ""}, as: :message))}
 
         {:error, _changeset} ->
@@ -260,14 +266,12 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
         # Update conversation title if it's the first message
         socket = maybe_update_title(socket, content, user_id)
 
-        # Load messages from DB for OpenAI API (streams don't keep data in assigns)
-        messages = Chat.list_messages(conversation_id)
-
-        # Build OpenAI format messages
-        openai_messages = Chat.build_openai_messages(messages)
-
         # Start streaming response from LM Studio
         model = socket.assigns.selected_model || "default"
+
+        # Build context with memory integration
+        {:ok, openai_messages} =
+          ContextBuilder.build_context(conversation_id, user_id, current_query: content)
 
         # Update conversation model if changed
         socket = maybe_update_model(socket, model)
@@ -292,6 +296,7 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
              |> assign(:streaming_chunks, [])
              |> assign(:streaming_task_pid, task_pid)
              |> assign(:is_streaming, true)
+             |> assign(:last_user_message, user_message.content)
              |> assign(:form, to_form(%{"content" => ""}, as: :message))}
 
           {:error, reason} ->
@@ -426,5 +431,24 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
      |> put_flash(:error, "Streaming failed unexpectedly. Please try again.")
      |> assign(:is_streaming, false)
      |> assign(:streaming_chunks, [])}
+  end
+
+  # Extracts facts from the conversation asynchronously
+  defp maybe_extract_facts(socket, complete_message, message_id) do
+    user_id = socket.assigns.current_user.id
+    user_message_content = socket.assigns[:last_user_message] || ""
+    model = socket.assigns.selected_model || "default"
+
+    if user_message_content != "" do
+      Task.Supervisor.start_child(Chatbot.TaskSupervisor, fn ->
+        FactExtractor.extract_and_store(
+          user_id,
+          user_message_content,
+          complete_message,
+          message_id,
+          model
+        )
+      end)
+    end
   end
 end
