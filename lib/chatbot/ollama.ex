@@ -49,11 +49,25 @@ defmodule Chatbot.Ollama do
   @provider_prefix "ollama/"
 
   defp base_url do
-    config()[:base_url] || "http://localhost:11434"
+    # Application config takes precedence (for tests), then Settings, then hardcoded default
+    config()[:base_url] ||
+      try do
+        Chatbot.Settings.get("ollama_url")
+      rescue
+        ArgumentError -> nil
+      end ||
+      "http://localhost:11434"
   end
 
   defp embedding_model do
-    config()[:embedding_model] || "qwen3-embedding:0.6b"
+    # Application config takes precedence (for tests), then Settings, then hardcoded default
+    config()[:embedding_model] ||
+      try do
+        Chatbot.Settings.get("ollama_embedding_model")
+      rescue
+        ArgumentError -> nil
+      end ||
+      "qwen3-embedding:0.6b"
   end
 
   defp timeout do

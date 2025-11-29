@@ -94,6 +94,7 @@ defmodule ChatbotWeb.SettingsLive do
         {:noreply,
          socket
          |> assign(:saving, false)
+         |> assign(:form, to_form(params, as: :settings))
          |> put_flash(:error, error_msg)}
     end
   end
