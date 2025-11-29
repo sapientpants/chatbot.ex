@@ -29,9 +29,10 @@ if config_env() == :prod do
       """
 
   maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
+  database_ssl = System.get_env("DATABASE_SSL") in ~w(true 1)
 
   config :chatbot, Chatbot.Repo,
-    ssl: true,
+    ssl: database_ssl,
     url: database_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "20"),
     queue_target: 50,
@@ -55,19 +56,6 @@ if config_env() == :prod do
   port = String.to_integer(System.get_env("PORT") || "4000")
 
   config :chatbot, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
-
-  # Session cookie salts - generate with: mix phx.gen.secret 32
-  signing_salt =
-    System.get_env("SIGNING_SALT") ||
-      raise "environment variable SIGNING_SALT is missing"
-
-  encryption_salt =
-    System.get_env("ENCRYPTION_SALT") ||
-      raise "environment variable ENCRYPTION_SALT is missing"
-
-  config :chatbot,
-    signing_salt: signing_salt,
-    encryption_salt: encryption_salt
 
   config :chatbot, ChatbotWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
@@ -135,4 +123,13 @@ if config_env() == :prod do
   # Configure Hammer rate limiting for production environment
   config :hammer,
     backend: {Hammer.Backend.ETS, [expiry_ms: 60_000 * 60 * 4, cleanup_interval_ms: 60_000 * 10]}
+
+  # LM Studio and Ollama configuration for production
+  if lm_studio_url = System.get_env("LM_STUDIO_URL") do
+    config :chatbot, :lm_studio, base_url: lm_studio_url
+  end
+
+  if ollama_url = System.get_env("OLLAMA_URL") do
+    config :chatbot, :ollama, base_url: ollama_url
+  end
 end

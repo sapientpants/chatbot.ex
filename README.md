@@ -14,17 +14,41 @@ capabilities.
 - 🎨 **Modern UI** - Built with Tailwind CSS and daisyUI components
 - 🌓 **Theme Support** - Light and dark theme toggle
 
+## Quick Start with Docker
+
+The fastest way to get started is using Docker:
+
+```bash
+# Clone and enter the repository
+git clone <repo-url> && cd chatbot
+
+# Create environment file with secrets
+cp .env.example .env
+openssl rand -base64 48  # Copy output to SECRET_KEY_BASE in .env
+
+# Start the application
+docker compose up --build
+```
+
+The app will be available at [`http://localhost:4000`](http://localhost:4000).
+
+Make sure both are running on your host machine:
+
+- **LM Studio** at `localhost:1234` (for chat completions)
+- **Ollama** at `localhost:11434` (for embeddings)
+
 ## Prerequisites
 
-Before you begin, ensure you have the following installed:
+For local development without Docker, ensure you have:
 
 - **Elixir** 1.15 or later
 - **Erlang/OTP** 27 or later
-- **PostgreSQL** 14 or later
+- **PostgreSQL** 14 or later (with pgvector extension for memory features)
 - **Node.js** (for asset compilation)
-- **LM Studio** - Download from [lmstudio.ai](https://lmstudio.ai/)
+- **LM Studio** - Download from [lmstudio.ai](https://lmstudio.ai/) (for chat completions)
+- **Ollama** - Download from [ollama.com](https://ollama.com/) (for embeddings)
 
-## Setup Instructions
+## Setup Instructions (Local Development)
 
 ### 1. Install Dependencies
 

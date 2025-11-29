@@ -40,3 +40,7 @@ npm-debug.log
 
 .claude/settings.local.json
 .playwright-mcp/
+
+# Environment files with secrets
+.env
+.env.local
