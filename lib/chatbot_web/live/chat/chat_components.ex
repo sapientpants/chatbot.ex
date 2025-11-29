@@ -238,11 +238,33 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
   @doc """
   Renders the streaming response indicator with partial content.
   Chunks are stored in reverse order for O(1) prepending, so we reverse when rendering.
+
+  Uses `last_valid_html` as fallback when markdown parsing fails on incomplete content.
   """
   attr :streaming_chunks, :list, required: true
+  attr :last_valid_html, :any, default: nil
 
   @spec streaming_response(map()) :: Phoenix.LiveView.Rendered.t()
+  # sobelow_skip ["XSS.Raw"]
   def streaming_response(assigns) do
+    content = assigns.streaming_chunks |> Enum.reverse() |> IO.iodata_to_binary()
+
+    # Try to parse current content, fall back to last valid HTML on error
+    html =
+      if content != "" do
+        case Earmark.as_html(content, code_class_prefix: "language-", smartypants: false) do
+          {:ok, html_string, _warnings} ->
+            html_string |> HtmlSanitizeEx.markdown_html() |> Phoenix.HTML.raw()
+
+          {:error, _html, _errors} ->
+            assigns.last_valid_html
+        end
+      else
+        nil
+      end
+
+    assigns = assign(assigns, :html, html)
+
     ~H"""
     <div class="flex gap-4">
       <div class="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 text-white flex items-center justify-center flex-shrink-0">
@@ -250,8 +272,20 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
       </div>
       <div class="flex-1 min-w-0">
         <div class="w-[85%] rounded-2xl rounded-bl-md px-4 py-3 bg-base-200 border border-base-300 shadow-sm">
-          <%= if @streaming_chunks != [] do %>
-            <.markdown content={@streaming_chunks |> Enum.reverse() |> IO.iodata_to_binary()} />
+          <%= if @html do %>
+            <div class={[
+              "prose prose-sm max-w-full dark:prose-invert",
+              "prose-p:my-3 prose-p:leading-relaxed",
+              "prose-pre:bg-base-300/80 prose-pre:text-base-content prose-pre:rounded-xl prose-pre:p-4 prose-pre:overflow-x-auto prose-pre:my-5 prose-pre:border prose-pre:border-base-content/10 prose-pre:shadow-sm",
+              "prose-code:bg-base-300 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:before:content-none prose-code:after:content-none",
+              "prose-ul:my-3 prose-ul:list-disc prose-ul:pl-5 prose-ol:my-3 prose-ol:list-decimal prose-ol:pl-5 prose-li:my-1.5 prose-li:marker:text-base-content/60",
+              "prose-headings:font-semibold prose-headings:text-base-content prose-h1:text-xl prose-h1:mt-6 prose-h1:mb-3 prose-h2:text-lg prose-h2:mt-5 prose-h2:mb-2 prose-h3:text-base prose-h3:mt-4 prose-h3:mb-2",
+              "prose-a:text-primary prose-a:no-underline hover:prose-a:underline",
+              "prose-blockquote:border-l-primary prose-blockquote:not-italic prose-blockquote:my-4 prose-blockquote:pl-4",
+              "prose-strong:font-semibold prose-strong:text-base-content"
+            ]}>
+              {@html}
+            </div>
           <% end %>
           <span class="loading loading-dots loading-sm text-primary"></span>
         </div>
@@ -321,6 +355,7 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
   attr :messages, :any, required: true, doc: "Stream of messages from LiveView stream/3"
   attr :is_streaming, :boolean, required: true
   attr :streaming_chunks, :list, required: true
+  attr :last_valid_html, :any, default: nil
 
   @spec messages_container(map()) :: Phoenix.LiveView.Rendered.t()
   def messages_container(assigns) do
@@ -342,7 +377,10 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
 
         <%= if @is_streaming do %>
           <div id="streaming-response">
-            <.streaming_response streaming_chunks={@streaming_chunks} />
+            <.streaming_response
+              streaming_chunks={@streaming_chunks}
+              last_valid_html={@last_valid_html}
+            />
           </div>
         <% end %>
       </div>

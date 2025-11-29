@@ -53,6 +53,7 @@ defmodule ChatbotWeb.ChatLive.Index do
       |> stream(:messages, messages)
       |> assign(:has_messages, messages != [])
       |> assign(:streaming_chunks, [])
+      |> assign(:last_valid_html, nil)
       |> assign(:is_streaming, false)
       |> assign(:available_models, [])
       |> assign(:selected_model, if(conversation, do: conversation.model_name, else: nil))
@@ -162,6 +163,7 @@ defmodule ChatbotWeb.ChatLive.Index do
             messages={@streams.messages}
             is_streaming={@is_streaming}
             streaming_chunks={@streaming_chunks}
+            last_valid_html={@last_valid_html}
           />
           <.message_input_form form={@form} is_streaming={@is_streaming} />
         <% end %>

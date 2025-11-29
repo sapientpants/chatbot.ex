@@ -140,12 +140,38 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   Handles incoming streaming chunks from the AI model.
   Prepends the chunk to the list of streaming chunks (O(1) operation).
   Chunks are stored in reverse order and reversed when rendering.
+
+  Also attempts to parse the accumulated content as markdown and caches
+  the last successfully parsed HTML for graceful fallback during streaming.
   """
   @spec handle_chunk(String.t(), Phoenix.LiveView.Socket.t()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_chunk(content, socket) do
-    chunks = socket.assigns[:streaming_chunks] || []
-    {:noreply, assign(socket, :streaming_chunks, [content | chunks])}
+    chunks = [content | socket.assigns[:streaming_chunks] || []]
+    full_content = chunks |> Enum.reverse() |> IO.iodata_to_binary()
+
+    # Try to parse markdown and cache if successful
+    # Content is sanitized with HtmlSanitizeEx before rendering as raw HTML
+    updated_socket =
+      socket
+      |> assign(:streaming_chunks, chunks)
+      |> maybe_cache_valid_html(full_content)
+
+    {:noreply, updated_socket}
+  end
+
+  # Attempts to parse markdown and cache the HTML if successful
+  # sobelow_skip ["XSS.Raw"]
+  defp maybe_cache_valid_html(socket, content) do
+    case Earmark.as_html(content, code_class_prefix: "language-", smartypants: false) do
+      {:ok, html_string, _warnings} ->
+        html = html_string |> HtmlSanitizeEx.markdown_html() |> Phoenix.HTML.raw()
+        assign(socket, :last_valid_html, html)
+
+      {:error, _html, _errors} ->
+        # Keep previous last_valid_html
+        socket
+    end
   end
 
   @doc """
@@ -185,6 +211,7 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
            |> assign(:conversations, conversations)
            |> assign(:is_streaming, false)
            |> assign(:streaming_chunks, [])
+           |> assign(:last_valid_html, nil)
            |> assign(:last_user_message, nil)
            |> assign(:form, to_form(%{"content" => ""}, as: :message))}
 
@@ -193,13 +220,15 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
            socket
            |> put_flash(:error, "Failed to save assistant message")
            |> assign(:is_streaming, false)
-           |> assign(:streaming_chunks, [])}
+           |> assign(:streaming_chunks, [])
+           |> assign(:last_valid_html, nil)}
       end
     else
       {:noreply,
        socket
        |> assign(:is_streaming, false)
-       |> assign(:streaming_chunks, [])}
+       |> assign(:streaming_chunks, [])
+       |> assign(:last_valid_html, nil)}
     end
   end
 
@@ -216,7 +245,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
      socket
      |> put_flash(:error, "Error: #{error_msg}")
      |> assign(:is_streaming, false)
-     |> assign(:streaming_chunks, [])}
+     |> assign(:streaming_chunks, [])
+     |> assign(:last_valid_html, nil)}
   end
 
   @doc """
@@ -392,6 +422,7 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
             socket
             |> assign(:has_messages, false)
             |> assign(:streaming_chunks, [])
+            |> assign(:last_valid_html, nil)
 
             # Keep the current selected_model - don't reset to nil
           else
@@ -430,7 +461,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
      socket
      |> put_flash(:error, "Streaming failed unexpectedly. Please try again.")
      |> assign(:is_streaming, false)
-     |> assign(:streaming_chunks, [])}
+     |> assign(:streaming_chunks, [])
+     |> assign(:last_valid_html, nil)}
   end
 
   # Extracts facts from the conversation asynchronously
