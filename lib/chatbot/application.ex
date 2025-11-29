@@ -14,6 +14,8 @@ defmodule Chatbot.Application do
       {Phoenix.PubSub, name: Chatbot.PubSub},
       # Rate limiting backend
       {Hammer.Backend.ETS, [expiry_ms: 60_000 * 60 * 4, cleanup_interval_ms: 60_000 * 10]},
+      # System settings (must start before ModelCache)
+      Chatbot.Settings,
       # Model list cache
       Chatbot.ModelCache,
       # Embedding cache for memory search queries

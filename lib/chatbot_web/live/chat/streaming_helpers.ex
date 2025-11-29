@@ -14,10 +14,10 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   import Phoenix.Component
 
   alias Chatbot.Chat
-  alias Chatbot.LMStudio
   alias Chatbot.Memory.ContextBuilder
   alias Chatbot.Memory.FactExtractor
   alias Chatbot.ModelCache
+  alias Chatbot.ProviderRouter
   alias ChatbotWeb.Plugs.RateLimiter
 
   require Logger
@@ -280,7 +280,7 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
         liveview_pid = self()
 
         case Task.Supervisor.start_child(Chatbot.TaskSupervisor, fn ->
-               LMStudio.stream_chat_completion(openai_messages, model, liveview_pid)
+               ProviderRouter.stream_chat_completion(openai_messages, model, liveview_pid)
              end) do
           {:ok, task_pid} ->
             # Register the task for concurrent limit tracking

@@ -11,7 +11,7 @@ defmodule Chatbot.Memory do
 
   alias Chatbot.Memory.ConversationSummary
   alias Chatbot.Memory.UserMemory
-  alias Chatbot.Ollama
+  alias Chatbot.ProviderRouter
   alias Chatbot.Repo
 
   # --- User Memories ---
@@ -313,14 +313,10 @@ defmodule Chatbot.Memory do
   defp generate_embedding(""), do: {:error, "Content cannot be empty"}
 
   defp generate_embedding(content) when is_binary(content) do
-    case ollama_client().embed(content) do
+    case ProviderRouter.embed(content) do
       {:ok, embedding} -> {:ok, Pgvector.new(embedding)}
       {:error, reason} -> {:error, reason}
     end
-  end
-
-  defp ollama_client do
-    Application.get_env(:chatbot, :ollama_client, Ollama)
   end
 
   @doc """

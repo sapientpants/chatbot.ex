@@ -83,6 +83,7 @@ defmodule ChatbotWeb.Router do
       on_mount: [{ChatbotWeb.UserAuth, :ensure_authenticated}] do
       live "/chat", ChatLive.Index
       live "/chat/:id", ChatLive.Show
+      live "/settings", SettingsLive
     end
 
     delete "/logout", UserSessionController, :delete
