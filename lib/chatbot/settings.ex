@@ -95,7 +95,7 @@ defmodule Chatbot.Settings do
   def get(key, default) when is_binary(key) do
     case :ets.lookup(@ets_table, key) do
       [{^key, value}] -> value
-      [] -> default
+      [] -> Map.get(@defaults, key, default)
     end
   end
 
