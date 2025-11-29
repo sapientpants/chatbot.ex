@@ -1,7 +1,13 @@
 defmodule Chatbot.Memory.FactExtractorTest do
-  use Chatbot.DataCase, async: true
+  use Chatbot.DataCase, async: false
 
+  import Mox
+
+  alias Chatbot.Memory
   alias Chatbot.Memory.FactExtractor
+
+  setup :set_mox_global
+  setup :verify_on_exit!
 
   describe "parse_response/1" do
     test "parses valid JSON array" do
@@ -148,6 +154,265 @@ That's all I found.|
 
       # Restore config
       Application.put_env(:chatbot, :memory, original)
+    end
+
+    test "extracts and stores facts when LLM returns valid response", %{
+      user: user,
+      message: message
+    } do
+      # Configure to use mock
+      original = Application.get_env(:chatbot, :lm_studio_client)
+      Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+
+      # Mock LLM response with valid facts
+      expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
+        {:ok,
+         %{
+           "choices" => [
+             %{
+               "message" => %{
+                 "content" =>
+                   ~s|[{"content": "User prefers dark mode", "category": "preference", "confidence": 0.9}]|
+               }
+             }
+           ]
+         }}
+      end)
+
+      result =
+        FactExtractor.extract_and_store(
+          user.id,
+          "I really prefer dark mode for coding",
+          "I've noted your preference for dark mode!",
+          message.id,
+          "test-model"
+        )
+
+      assert result == :ok
+
+      # Verify the memory was stored
+      memories = Memory.list_memories(user.id)
+      assert length(memories) == 1
+      assert hd(memories).content == "User prefers dark mode"
+
+      # Restore config
+      if original,
+        do: Application.put_env(:chatbot, :lm_studio_client, original),
+        else: Application.delete_env(:chatbot, :lm_studio_client)
+    end
+
+    test "returns :ok when LLM returns empty facts array", %{user: user, message: message} do
+      original = Application.get_env(:chatbot, :lm_studio_client)
+      Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+
+      expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
+        {:ok,
+         %{
+           "choices" => [
+             %{
+               "message" => %{"content" => "[]"}
+             }
+           ]
+         }}
+      end)
+
+      result =
+        FactExtractor.extract_and_store(
+          user.id,
+          "What's 2+2?",
+          "It's 4!",
+          message.id,
+          "test-model"
+        )
+
+      assert result == :ok
+
+      if original,
+        do: Application.put_env(:chatbot, :lm_studio_client, original),
+        else: Application.delete_env(:chatbot, :lm_studio_client)
+    end
+
+    test "handles LLM error gracefully", %{user: user, message: message} do
+      original = Application.get_env(:chatbot, :lm_studio_client)
+      Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+
+      expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
+        {:error, "Connection refused"}
+      end)
+
+      result =
+        FactExtractor.extract_and_store(
+          user.id,
+          "Test message",
+          "Test response",
+          message.id,
+          "test-model"
+        )
+
+      assert {:error, "Connection refused"} = result
+
+      if original,
+        do: Application.put_env(:chatbot, :lm_studio_client, original),
+        else: Application.delete_env(:chatbot, :lm_studio_client)
+    end
+
+    test "handles unexpected response format", %{user: user, message: message} do
+      original = Application.get_env(:chatbot, :lm_studio_client)
+      Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+
+      expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
+        {:ok, %{"unexpected" => "format"}}
+      end)
+
+      result =
+        FactExtractor.extract_and_store(
+          user.id,
+          "Test message",
+          "Test response",
+          message.id,
+          "test-model"
+        )
+
+      assert {:error, :unexpected_response} = result
+
+      if original,
+        do: Application.put_env(:chatbot, :lm_studio_client, original),
+        else: Application.delete_env(:chatbot, :lm_studio_client)
+    end
+
+    test "handles invalid JSON from LLM gracefully", %{user: user, message: message} do
+      original = Application.get_env(:chatbot, :lm_studio_client)
+      Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+
+      expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
+        {:ok,
+         %{
+           "choices" => [
+             %{
+               "message" => %{"content" => "I found some facts but forgot to format them as JSON"}
+             }
+           ]
+         }}
+      end)
+
+      result =
+        FactExtractor.extract_and_store(
+          user.id,
+          "Test message",
+          "Test response",
+          message.id,
+          "test-model"
+        )
+
+      # Should return :ok even when parsing fails (logged as warning)
+      assert result == :ok
+
+      if original,
+        do: Application.put_env(:chatbot, :lm_studio_client, original),
+        else: Application.delete_env(:chatbot, :lm_studio_client)
+    end
+
+    test "filters low confidence facts", %{user: user, message: message} do
+      original = Application.get_env(:chatbot, :lm_studio_client)
+      Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+
+      expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
+        {:ok,
+         %{
+           "choices" => [
+             %{
+               "message" => %{
+                 "content" => ~s|[
+                {"content": "High confidence fact", "category": "preference", "confidence": 0.9},
+                {"content": "Low confidence fact", "category": "preference", "confidence": 0.1}
+              ]|
+               }
+             }
+           ]
+         }}
+      end)
+
+      result =
+        FactExtractor.extract_and_store(
+          user.id,
+          "Some message",
+          "Some response",
+          message.id,
+          "test-model"
+        )
+
+      assert result == :ok
+
+      # Only high confidence fact should be stored
+      memories = Memory.list_memories(user.id)
+      assert length(memories) == 1
+      assert hd(memories).content == "High confidence fact"
+
+      if original,
+        do: Application.put_env(:chatbot, :lm_studio_client, original),
+        else: Application.delete_env(:chatbot, :lm_studio_client)
+    end
+
+    test "skips duplicate facts based on similarity", %{user: user, message: message} do
+      original_lm = Application.get_env(:chatbot, :lm_studio_client)
+      original_ollama = Application.get_env(:chatbot, :ollama_client)
+      Application.put_env(:chatbot, :lm_studio_client, Chatbot.LMStudioMock)
+      Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
+
+      # First, create an existing memory
+      embedding = List.duplicate(0.1, 1024)
+
+      {:ok, _memory} =
+        Memory.create_memory(%{
+          user_id: user.id,
+          content: "User prefers dark mode",
+          category: "preference",
+          confidence: 0.9,
+          embedding: Pgvector.new(embedding),
+          source_message_id: message.id
+        })
+
+      # Mock embedding for similarity search
+      stub(Chatbot.OllamaMock, :embed, fn _text -> {:ok, embedding} end)
+      stub(Chatbot.OllamaMock, :embedding_dimension, fn -> 1024 end)
+
+      # Try to extract a very similar fact
+      expect(Chatbot.LMStudioMock, :chat_completion, fn _messages, _model ->
+        {:ok,
+         %{
+           "choices" => [
+             %{
+               "message" => %{
+                 "content" =>
+                   ~s|[{"content": "User prefers dark mode", "category": "preference", "confidence": 0.9}]|
+               }
+             }
+           ]
+         }}
+      end)
+
+      result =
+        FactExtractor.extract_and_store(
+          user.id,
+          "I like dark mode",
+          "Got it!",
+          message.id,
+          "test-model"
+        )
+
+      assert result == :ok
+
+      # Should still only have one memory (duplicate was skipped)
+      memories = Memory.list_memories(user.id)
+      assert length(memories) == 1
+
+      if original_lm,
+        do: Application.put_env(:chatbot, :lm_studio_client, original_lm),
+        else: Application.delete_env(:chatbot, :lm_studio_client)
+
+      if original_ollama,
+        do: Application.put_env(:chatbot, :ollama_client, original_ollama),
+        else: Application.delete_env(:chatbot, :ollama_client)
     end
   end
 end

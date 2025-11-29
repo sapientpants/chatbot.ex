@@ -1,9 +1,15 @@
 defmodule Chatbot.Memory.ContextBuilderTest do
-  use Chatbot.DataCase, async: true
+  use Chatbot.DataCase, async: false
 
+  import Mox
+
+  alias Chatbot.Memory
   alias Chatbot.Memory.ContextBuilder
 
   import Chatbot.Fixtures
+
+  setup :set_mox_global
+  setup :verify_on_exit!
 
   describe "estimate_tokens/1" do
     test "returns 0 for nil" do
@@ -188,6 +194,162 @@ defmodule Chatbot.Memory.ContextBuilderTest do
       # One should contain summary
       contents = Enum.map(system_messages, & &1.content)
       assert Enum.any?(contents, &(&1 =~ "Summary of previous discussion"))
+    end
+  end
+
+  describe "build_memory_context/2 with memories" do
+    setup do
+      user = user_fixture()
+      {:ok, conversation} = Chatbot.Chat.create_conversation(%{user_id: user.id, title: "Test"})
+
+      original_ollama = Application.get_env(:chatbot, :ollama_client)
+      Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
+
+      on_exit(fn ->
+        if original_ollama,
+          do: Application.put_env(:chatbot, :ollama_client, original_ollama),
+          else: Application.delete_env(:chatbot, :ollama_client)
+      end)
+
+      {:ok, user: user, conversation: conversation}
+    end
+
+    test "includes memories in context when found", %{user: user} do
+      # Create test memories with embeddings
+      embedding = List.duplicate(0.1, 1024)
+
+      {:ok, _memory} =
+        Memory.create_memory(%{
+          user_id: user.id,
+          content: "User prefers dark mode",
+          category: "preference",
+          confidence: 0.9,
+          embedding: Pgvector.new(embedding)
+        })
+
+      # Mock embedding for search
+      stub(Chatbot.OllamaMock, :embed, fn _text -> {:ok, embedding} end)
+      stub(Chatbot.OllamaMock, :embedding_dimension, fn -> 1024 end)
+
+      result = ContextBuilder.build_memory_context(user.id, "What are my preferences?")
+
+      assert result =~ "Relevant information about this user"
+      assert result =~ "Preference"
+      assert result =~ "User prefers dark mode"
+    end
+
+    test "formats different memory categories", %{user: user} do
+      embedding = List.duplicate(0.1, 1024)
+
+      # Create memories with different categories
+      for {content, category} <- [
+            {"User is a software developer", "skill"},
+            {"User is named John", "personal_info"},
+            {"User is working on a chat app", "project"},
+            {"User mentioned meeting next week", "context"}
+          ] do
+        {:ok, _memory} =
+          Memory.create_memory(%{
+            user_id: user.id,
+            content: content,
+            category: category,
+            confidence: 0.9,
+            embedding: Pgvector.new(embedding)
+          })
+      end
+
+      stub(Chatbot.OllamaMock, :embed, fn _text -> {:ok, embedding} end)
+      stub(Chatbot.OllamaMock, :embedding_dimension, fn -> 1024 end)
+
+      result = ContextBuilder.build_memory_context(user.id, "Tell me about myself")
+
+      # Should have formatted category labels
+      assert result =~ "Skill"
+      assert result =~ "About user"
+      assert result =~ "Project"
+      assert result =~ "Context"
+    end
+
+    test "returns empty string when search fails", %{user: user} do
+      stub(Chatbot.OllamaMock, :embed, fn _text -> {:error, "Connection refused"} end)
+      stub(Chatbot.OllamaMock, :embedding_dimension, fn -> 1024 end)
+
+      result = ContextBuilder.build_memory_context(user.id, "test query")
+
+      assert result == ""
+    end
+  end
+
+  describe "build_context/3 with memories" do
+    setup do
+      user = user_fixture()
+      {:ok, conversation} = Chatbot.Chat.create_conversation(%{user_id: user.id, title: "Test"})
+
+      {:ok, _msg1} =
+        Chatbot.Chat.create_message(%{
+          conversation_id: conversation.id,
+          role: "user",
+          content: "Hello"
+        })
+
+      original_ollama = Application.get_env(:chatbot, :ollama_client)
+      Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
+
+      on_exit(fn ->
+        if original_ollama,
+          do: Application.put_env(:chatbot, :ollama_client, original_ollama),
+          else: Application.delete_env(:chatbot, :ollama_client)
+      end)
+
+      {:ok, user: user, conversation: conversation}
+    end
+
+    test "includes memory context in system prompt", %{user: user, conversation: conversation} do
+      embedding = List.duplicate(0.1, 1024)
+
+      {:ok, _memory} =
+        Memory.create_memory(%{
+          user_id: user.id,
+          content: "User likes Elixir",
+          category: "preference",
+          confidence: 0.9,
+          embedding: Pgvector.new(embedding)
+        })
+
+      stub(Chatbot.OllamaMock, :embed, fn _text -> {:ok, embedding} end)
+      stub(Chatbot.OllamaMock, :embedding_dimension, fn -> 1024 end)
+
+      {:ok, messages} =
+        ContextBuilder.build_context(
+          conversation.id,
+          user.id,
+          current_query: "What language should I use?"
+        )
+
+      system_prompt = hd(messages).content
+      assert system_prompt =~ "User likes Elixir"
+    end
+
+    test "respects token budget", %{user: user, conversation: conversation} do
+      # Add many messages to exceed budget
+      for i <- 1..50 do
+        Chatbot.Chat.create_message(%{
+          conversation_id: conversation.id,
+          role: if(rem(i, 2) == 0, do: "assistant", else: "user"),
+          content: String.duplicate("This is a long message content. ", 20)
+        })
+      end
+
+      {:ok, messages} =
+        ContextBuilder.build_context(
+          conversation.id,
+          user.id,
+          token_budget: 500
+        )
+
+      # Should have fewer than all messages due to budget
+      non_system_messages = Enum.filter(messages, &(&1.role != "system"))
+      assert length(non_system_messages) < 50
     end
   end
 end
