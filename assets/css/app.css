@@ -150,6 +150,18 @@
   margin-bottom: 0.5rem;
 }
 
+/* Code block horizontal scrolling */
+.prose pre {
+  overflow-x: auto;
+}
+
+.prose pre code {
+  display: block;
+  white-space: pre;
+  word-wrap: normal;
+  overflow-wrap: normal;
+}
+
 /* Syntax highlighting for code blocks - Light theme (GitHub style) */
 .hljs {
   background: transparent;

@@ -469,7 +469,7 @@ defmodule ChatbotWeb.CoreComponents do
 
     ~H"""
     <div class={[
-      "prose prose-sm max-w-none dark:prose-invert",
+      "prose prose-sm max-w-full dark:prose-invert",
       "prose-p:my-3 prose-p:leading-relaxed",
       "prose-pre:bg-base-300/80 prose-pre:text-base-content prose-pre:rounded-xl prose-pre:p-4 prose-pre:overflow-x-auto prose-pre:my-5 prose-pre:border prose-pre:border-base-content/10 prose-pre:shadow-sm",
       "prose-code:bg-base-300 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:before:content-none prose-code:after:content-none",
