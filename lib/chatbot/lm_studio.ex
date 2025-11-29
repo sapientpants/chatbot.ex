@@ -43,7 +43,14 @@ defmodule Chatbot.LMStudio do
   end
 
   defp base_url do
-    config()[:base_url] || "http://localhost:1234/v1"
+    # Application config takes precedence (for tests), then Settings, then hardcoded default
+    config()[:base_url] ||
+      try do
+        Chatbot.Settings.get("lmstudio_url")
+      rescue
+        ArgumentError -> nil
+      end ||
+      "http://localhost:1234/v1"
   end
 
   defp stream_timeout do

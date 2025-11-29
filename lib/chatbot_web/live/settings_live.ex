@@ -85,10 +85,16 @@ defmodule ChatbotWeb.SettingsLive do
         {:noreply, socket}
 
       {:error, reason} ->
+        error_msg =
+          case reason do
+            %Ecto.Changeset{} -> "Invalid settings data. Please check your inputs."
+            _other -> "Failed to save settings. Please try again."
+          end
+
         {:noreply,
          socket
          |> assign(:saving, false)
-         |> put_flash(:error, "Failed to save settings: #{inspect(reason)}")}
+         |> put_flash(:error, error_msg)}
     end
   end
 
@@ -194,6 +200,7 @@ defmodule ChatbotWeb.SettingsLive do
 
               <div class="form-control">
                 <label class="label cursor-pointer justify-start gap-4">
+                  <input type="hidden" name="settings[lmstudio_enabled]" value="false" />
                   <input
                     type="checkbox"
                     name="settings[lmstudio_enabled]"

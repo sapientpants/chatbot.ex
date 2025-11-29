@@ -429,17 +429,22 @@ defmodule Chatbot.Ollama do
           {response, remaining}
       end
 
-      {:ok, {response, _remaining_buffer}} =
-        Finch.stream(
-          finch_request,
-          finch_name,
-          {Req.Response.new(), buffer},
-          stream_handler,
-          finch_options
-        )
+      case Finch.stream(
+             finch_request,
+             finch_name,
+             {Req.Response.new(), buffer},
+             stream_handler,
+             finch_options
+           ) do
+        {:ok, {response, _remaining_buffer}} ->
+          send(pid, {:done, ""})
+          {request, response}
 
-      send(pid, {:done, ""})
-      {request, response}
+        {:error, reason} ->
+          Logger.warning("Finch stream error: #{inspect(reason)}")
+          send(pid, {:error, "Failed to get AI response. Please try again."})
+          raise "Finch streaming failed: #{inspect(reason)}"
+      end
     end
 
     try do
