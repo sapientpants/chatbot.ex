@@ -161,9 +161,7 @@ That's all I found.|
       message: message
     } do
       # Configure to use mocks
-      original_lm = Application.get_env(:chatbot, :lm_studio_client)
       original_ollama = Application.get_env(:chatbot, :ollama_client)
-      Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
       Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
 
       # Mock Ollama for embedding generation
@@ -203,10 +201,6 @@ That's all I found.|
       assert hd(memories).content == "User prefers dark mode"
 
       # Restore config
-      if original_lm,
-        do: Application.put_env(:chatbot, :lm_studio_client, original_lm),
-        else: Application.delete_env(:chatbot, :ollama_client)
-
       if original_ollama,
         do: Application.put_env(:chatbot, :ollama_client, original_ollama),
         else: Application.delete_env(:chatbot, :ollama_client)
@@ -324,9 +318,7 @@ That's all I found.|
     end
 
     test "filters low confidence facts", %{user: user, message: message} do
-      original_lm = Application.get_env(:chatbot, :lm_studio_client)
       original_ollama = Application.get_env(:chatbot, :ollama_client)
-      Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
       Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
 
       # Mock Ollama for embedding generation
@@ -366,19 +358,13 @@ That's all I found.|
       assert length(memories) == 1
       assert hd(memories).content == "High confidence fact"
 
-      if original_lm,
-        do: Application.put_env(:chatbot, :lm_studio_client, original_lm),
-        else: Application.delete_env(:chatbot, :ollama_client)
-
       if original_ollama,
         do: Application.put_env(:chatbot, :ollama_client, original_ollama),
         else: Application.delete_env(:chatbot, :ollama_client)
     end
 
     test "skips duplicate facts based on similarity", %{user: user, message: message} do
-      original_lm = Application.get_env(:chatbot, :lm_studio_client)
       original_ollama = Application.get_env(:chatbot, :ollama_client)
-      Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
       Application.put_env(:chatbot, :ollama_client, Chatbot.OllamaMock)
 
       # First, create an existing memory using create_memory_without_embedding
@@ -427,10 +413,6 @@ That's all I found.|
       # Should still only have one memory (duplicate was skipped)
       memories = Memory.list_memories(user.id)
       assert length(memories) == 1
-
-      if original_lm,
-        do: Application.put_env(:chatbot, :lm_studio_client, original_lm),
-        else: Application.delete_env(:chatbot, :ollama_client)
 
       if original_ollama,
         do: Application.put_env(:chatbot, :ollama_client, original_ollama),
