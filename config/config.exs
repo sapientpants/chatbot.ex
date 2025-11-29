@@ -27,6 +27,24 @@ config :chatbot, :lm_studio,
 # Model cache configuration
 config :chatbot, :model_cache, ttl_ms: 60_000
 
+# Ollama configuration (for embeddings)
+config :chatbot, :ollama,
+  base_url: "http://localhost:11434",
+  embedding_model: "qwen3-embedding:0.6b",
+  embedding_dimension: 1024,
+  timeout_ms: 30_000
+
+# Memory system configuration
+config :chatbot, :memory,
+  enabled: true,
+  max_memories_per_user: 1000,
+  retrieval_limit: 5,
+  semantic_weight: 0.6,
+  keyword_weight: 0.4,
+  token_budget: 4000,
+  fact_extraction_enabled: true,
+  summarization_threshold: 30
+
 # UI configuration
 config :chatbot, :ui,
   max_model_name_length: 20,

@@ -36,7 +36,8 @@ if config_env() == :prod do
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "20"),
     queue_target: 50,
     queue_interval: 1000,
-    socket_options: maybe_ipv6
+    socket_options: maybe_ipv6,
+    types: Chatbot.PostgresTypes
 
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you
