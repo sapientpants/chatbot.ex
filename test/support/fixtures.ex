@@ -13,7 +13,7 @@ defmodule Chatbot.Fixtures do
 
   @doc """
   Generate a user password for tests.
-  Meets complexity requirements: uppercase, lowercase, number, and special character.
+  Meets NIST SP 800-63B-4 minimum length requirement (15+ characters).
   """
   def valid_user_password, do: "Hello_World_123!"
 

@@ -21,17 +21,15 @@ defmodule Chatbot.AccountsTest do
 
       errors = errors_on(changeset)
       assert errors.email == ["must have the @ sign and no spaces"]
-      assert "should be at least 12 character(s)" in errors.password
-      assert "must contain at least one uppercase letter" in errors.password
-      assert "must contain at least one number" in errors.password
-      assert "must contain at least one special character" in errors.password
+      # NIST SP 800-63B-4 compliant: only length requirement, no composition rules
+      assert "should be at least 15 character(s)" in errors.password
     end
 
     test "validates maximum values for email and password for security" do
       too_long = String.duplicate("a", 200)
       {:error, changeset} = Accounts.register_user(%{email: too_long, password: too_long})
       assert "should be at most 160 character(s)" in errors_on(changeset).email
-      assert "should be at most 72 character(s)" in errors_on(changeset).password
+      assert "should be at most 128 character(s)" in errors_on(changeset).password
     end
 
     test "validates email uniqueness" do
@@ -234,7 +232,7 @@ defmodule Chatbot.AccountsTest do
         })
 
       assert %Ecto.Changeset{} = changeset
-      assert "should be at least 12 character(s)" in errors_on(changeset).password
+      assert "should be at least 15 character(s)" in errors_on(changeset).password
     end
   end
 
@@ -254,7 +252,7 @@ defmodule Chatbot.AccountsTest do
         })
 
       refute changeset.valid?
-      assert "should be at least 12 character(s)" in errors_on(changeset).password
+      assert "should be at least 15 character(s)" in errors_on(changeset).password
     end
   end
 end
