@@ -24,7 +24,7 @@ git clone <repo-url> && cd chatbot
 
 # Create environment file with secrets
 cp .env.example .env
-mix phx.gen.secret  # Copy output to SECRET_KEY_BASE in .env
+openssl rand -base64 48  # Copy output to SECRET_KEY_BASE in .env
 
 # Start the application
 docker compose up --build

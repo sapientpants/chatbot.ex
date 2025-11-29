@@ -23,7 +23,8 @@ services:
       - "4000:4000"
     environment:
       DATABASE_URL: ecto://postgres:postgres@db/chatbot_dev
-      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-generate-a-secret-key-base-with-mix-phx.gen.secret}
+      DATABASE_SSL: "false"
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:?SECRET_KEY_BASE must be set in .env file}
       PHX_HOST: ${PHX_HOST:-localhost}
       PHX_SERVER: "true"
       PORT: "4000"
