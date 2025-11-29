@@ -70,21 +70,29 @@ defmodule Chatbot.Accounts.User do
     |> maybe_validate_unique_email(opts)
   end
 
+  # NIST SP 800-63B-4 compliant password validation:
+  # - Minimum 15 characters (when password is sole authenticator)
+  # - Maximum 64+ characters allowed
+  # - No composition rules (no required uppercase, numbers, symbols)
+  # - Blocklist check for commonly compromised passwords
   defp validate_password(changeset, opts) do
     changeset
     |> validate_required([:password])
-    |> validate_length(:password, min: 12, max: 72)
-    |> validate_format(:password, ~r/[a-z]/,
-      message: "must contain at least one lowercase letter"
-    )
-    |> validate_format(:password, ~r/[A-Z]/,
-      message: "must contain at least one uppercase letter"
-    )
-    |> validate_format(:password, ~r/[0-9]/, message: "must contain at least one number")
-    |> validate_format(:password, ~r/[!?@#$%^&*_]/,
-      message: "must contain at least one special character"
-    )
+    |> validate_length(:password, min: 15, max: 128)
+    |> validate_not_in_blocklist()
     |> maybe_hash_password(opts)
+  end
+
+  defp validate_not_in_blocklist(changeset) do
+    alias Chatbot.Accounts.PasswordBlocklist
+
+    validate_change(changeset, :password, fn :password, password ->
+      if PasswordBlocklist.blocked?(password) do
+        [password: PasswordBlocklist.blocked_message()]
+      else
+        []
+      end
+    end)
   end
 
   defp maybe_hash_password(changeset, opts) do

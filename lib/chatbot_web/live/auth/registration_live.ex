@@ -111,25 +111,15 @@ defmodule ChatbotWeb.RegistrationLive do
                 ]}>
                   <span :if={password_requirement_met?(@form[:password].value, :length)}>✓</span>
                   <span :if={!password_requirement_met?(@form[:password].value, :length)}>○</span>
-                  At least 12 characters
+                  At least 15 characters
                 </li>
-                <li class={[
-                  "flex items-center gap-2",
-                  password_requirement_met?(@form[:password].value, :uppercase) && "text-success"
-                ]}>
-                  <span :if={password_requirement_met?(@form[:password].value, :uppercase)}>✓</span>
-                  <span :if={!password_requirement_met?(@form[:password].value, :uppercase)}>○</span>
-                  At least one uppercase letter
-                </li>
-                <li class={[
-                  "flex items-center gap-2",
-                  password_requirement_met?(@form[:password].value, :special) && "text-success"
-                ]}>
-                  <span :if={password_requirement_met?(@form[:password].value, :special)}>✓</span>
-                  <span :if={!password_requirement_met?(@form[:password].value, :special)}>○</span>
-                  At least one special character
+                <li class="flex items-center gap-2 text-base-content/70">
+                  <span>○</span> Not a commonly used password
                 </li>
               </ul>
+              <p class="text-xs text-base-content/50 mt-2">
+                Per NIST guidelines, we recommend using a passphrase or random words.
+              </p>
             </div>
           </div>
 
@@ -218,20 +208,12 @@ defmodule ChatbotWeb.RegistrationLive do
     end
   end
 
-  # Helper function to check password requirements
+  # Helper function to check password requirements (NIST SP 800-63B-4 compliant)
   defp password_requirement_met?(nil, _requirement), do: false
   defp password_requirement_met?("", _requirement), do: false
 
   defp password_requirement_met?(password, :length) when is_binary(password) do
-    String.length(password) >= 12
-  end
-
-  defp password_requirement_met?(password, :uppercase) when is_binary(password) do
-    String.match?(password, ~r/[A-Z]/)
-  end
-
-  defp password_requirement_met?(password, :special) when is_binary(password) do
-    String.match?(password, ~r/[^A-Za-z0-9]/)
+    String.length(password) >= 15
   end
 
   defp password_requirement_met?(_password, _requirement), do: false
