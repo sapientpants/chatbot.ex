@@ -161,7 +161,7 @@ defmodule Chatbot.Settings do
   @doc """
   Returns the default values for all settings.
   """
-  @spec defaults() :: map()
+  @spec defaults() :: %{String.t() => String.t()}
   def defaults, do: @defaults
 
   @doc """
