@@ -6,6 +6,17 @@ defmodule Chatbot.AccountsTest do
   alias Chatbot.Accounts.User
   import Chatbot.Fixtures
 
+  describe "user_exists?/0" do
+    test "returns false when no users exist" do
+      refute Accounts.user_exists?()
+    end
+
+    test "returns true when a user exists" do
+      user_fixture()
+      assert Accounts.user_exists?()
+    end
+  end
+
   describe "register_user/1" do
     test "requires email and password to be set" do
       {:error, changeset} = Accounts.register_user(%{})
@@ -47,6 +58,21 @@ defmodule Chatbot.AccountsTest do
       assert user.email == email
       assert is_binary(user.hashed_password)
       assert is_nil(user.password)
+    end
+
+    test "auto-confirms users on registration" do
+      email = unique_user_email()
+      {:ok, user} = Accounts.register_user(valid_user_attributes(email: email))
+      assert %DateTime{} = user.confirmed_at
+    end
+
+    test "rejects registration when a user already exists" do
+      # First user succeeds
+      {:ok, _user} = Accounts.register_user(valid_user_attributes())
+
+      # Second user fails
+      {:error, changeset} = Accounts.register_user(valid_user_attributes())
+      assert "Registration is closed" in errors_on(changeset).base
     end
   end
 

@@ -3,8 +3,9 @@ defmodule Chatbot.Fixtures do
   This module defines test fixtures for creating test data.
   """
 
-  alias Chatbot.Accounts
+  alias Chatbot.Accounts.User
   alias Chatbot.Chat
+  alias Chatbot.Repo
 
   @doc """
   Generate a unique user email.
@@ -30,25 +31,14 @@ defmodule Chatbot.Fixtures do
   @doc """
   Generate a user.
 
-  By default creates a confirmed user for easier testing.
-  Pass `confirmed: false` to create an unconfirmed user.
+  Inserts directly into the database, bypassing the first-user-only
+  business logic constraint. This allows tests to create multiple users
+  for testing purposes.
   """
   def user_fixture(attrs \\ %{}) do
-    {confirmed, attrs} = Map.pop(attrs, :confirmed, true)
-
-    {:ok, user} =
-      attrs
-      |> valid_user_attributes()
-      |> Accounts.register_user()
-
-    if confirmed do
-      # Confirm the user directly in the database for testing
-      user
-      |> Ecto.Changeset.change(%{confirmed_at: DateTime.utc_now(:second)})
-      |> Chatbot.Repo.update!()
-    else
-      user
-    end
+    %User{}
+    |> User.registration_changeset(valid_user_attributes(attrs))
+    |> Repo.insert!()
   end
 
   @doc """

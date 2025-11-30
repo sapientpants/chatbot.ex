@@ -2,6 +2,7 @@ defmodule ChatbotWeb.AuthLiveTest do
   use ChatbotWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
+  import Chatbot.Fixtures
 
   describe "LoginLive" do
     test "renders login page", %{conn: conn} do
@@ -20,12 +21,22 @@ defmodule ChatbotWeb.AuthLiveTest do
   end
 
   describe "RegisterLive" do
-    test "renders registration page", %{conn: conn} do
+    test "renders registration page when no users exist", %{conn: conn} do
       {:ok, _lv, html} = live(conn, ~p"/register")
 
       assert html =~ "Create an account"
       assert html =~ "Email"
       assert html =~ "Password"
+    end
+
+    test "redirects to login when a user already exists", %{conn: conn} do
+      # Create a user first
+      user_fixture()
+
+      # Attempting to visit registration should redirect to login
+      {:error, {:redirect, %{to: "/login", flash: flash}}} = live(conn, ~p"/register")
+
+      assert flash["error"] =~ "Registration is closed"
     end
 
     test "renders errors for invalid data", %{conn: conn} do

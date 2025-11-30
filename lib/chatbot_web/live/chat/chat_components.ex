@@ -223,7 +223,7 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
           @message.role == "user" &&
             "inline-block max-w-[85%] bg-primary text-primary-content rounded-br-md",
           @message.role != "user" &&
-            "w-[85%] bg-base-200 rounded-bl-md border border-base-300 shadow-sm"
+            "inline-block max-w-[85%] bg-base-200 rounded-bl-md border border-base-300 shadow-sm"
         ]}>
           <.markdown content={@message.content} />
         </div>
@@ -271,7 +271,7 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
         <.icon name="hero-sparkles" class="w-4 h-4" />
       </div>
       <div class="flex-1 min-w-0">
-        <div class="w-[85%] rounded-2xl rounded-bl-md px-4 py-3 bg-base-200 border border-base-300 shadow-sm">
+        <div class="inline-block max-w-[85%] rounded-2xl rounded-bl-md px-4 py-3 bg-base-200 border border-base-300 shadow-sm">
           <%= if @html do %>
             <div class={[
               "prose prose-sm max-w-full dark:prose-invert",
@@ -368,7 +368,7 @@ defmodule ChatbotWeb.Live.Chat.ChatComponents do
       aria-live="polite"
       phx-hook="ScrollToBottom"
     >
-      <div class="max-w-3xl mx-auto py-6 px-4 space-y-6">
+      <div class="max-w-3xl w-[100%] mx-auto py-6 px-4 space-y-6">
         <div id="messages-list" phx-update="stream">
           <div :for={{dom_id, message} <- @messages} id={dom_id} class="mb-6">
             <.chat_message message={message} />
