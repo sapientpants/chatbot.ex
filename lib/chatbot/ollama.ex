@@ -530,7 +530,7 @@ defmodule Chatbot.Ollama do
   end
 
   defp generate_tool_call_id do
-    Base.encode16("call_" <> :crypto.strong_rand_bytes(12), case: :lower)
+    "call_" <> Base.encode16(:crypto.strong_rand_bytes(12), case: :lower)
   end
 
   @doc """
