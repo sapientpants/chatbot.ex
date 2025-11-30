@@ -24,4 +24,8 @@ defmodule Chatbot.OllamaBehaviour do
   @callback list_models() :: {:ok, [model_info()]} | {:error, String.t()}
   @callback chat_completion(messages(), String.t()) :: {:ok, map()} | {:error, String.t()}
   @callback stream_chat_completion(messages(), String.t(), pid()) :: :ok | {:error, String.t()}
+
+  # Tool-enabled chat completion (non-streaming, required for tool calling)
+  @callback chat_with_tools(messages(), [map()], String.t()) ::
+              {:ok, map()} | {:error, String.t()}
 end

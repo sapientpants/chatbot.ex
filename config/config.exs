@@ -35,6 +35,13 @@ config :chatbot, :ollama,
   timeout_ms: 30_000,
   stream_timeout_ms: 300_000
 
+# MCP (Model Context Protocol) configuration
+config :chatbot, :mcp,
+  tool_timeout_ms: 30_000,
+  agent_loop_timeout_ms: 120_000,
+  max_agent_iterations: 10,
+  max_result_size_bytes: 100_000
+
 # Memory system configuration
 config :chatbot, :memory,
   enabled: true,

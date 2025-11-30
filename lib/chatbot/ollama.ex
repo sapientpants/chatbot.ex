@@ -378,6 +378,158 @@ defmodule Chatbot.Ollama do
   end
 
   @doc """
+  Sends a non-streaming chat completion request with tool definitions.
+
+  This enables tool/function calling with Ollama. Note that streaming is NOT
+  supported when tools are enabled - this is a limitation of the Ollama API.
+
+  ## Parameters
+    - messages: List of messages in OpenAI format [%{role: "user", content: "..."}]
+    - tools: List of tool definitions in OpenAI format
+    - model: Model name to use (with or without `ollama/` prefix)
+
+  ## Returns
+    - `{:ok, response}` with the completion, potentially including tool_calls
+    - `{:error, reason}` on failure
+
+  ## Tool Response Format
+  When the model decides to call tools, the response message will include:
+    - `tool_calls`: List of tool calls with id, name, and arguments
+
+  ## Examples
+
+      tools = [%{
+        "type" => "function",
+        "function" => %{
+          "name" => "get_weather",
+          "description" => "Get current weather",
+          "parameters" => %{"type" => "object", "properties" => %{}}
+        }
+      }]
+      {:ok, response} = chat_with_tools(messages, tools, "llama3.1")
+
+  """
+  @impl Chatbot.OllamaBehaviour
+  @spec chat_with_tools(messages(), [map()], String.t()) :: {:ok, map()} | {:error, String.t()}
+  def chat_with_tools(messages, tools, model) do
+    with_circuit_breaker(fn ->
+      # Strip provider prefix if present
+      model_name = strip_provider_prefix(model)
+
+      # Convert OpenAI-format tools to Ollama format if needed
+      ollama_tools = convert_tools_to_ollama_format(tools)
+
+      body = %{
+        model: model_name,
+        messages: messages,
+        tools: ollama_tools,
+        stream: false
+      }
+
+      case Req.post("#{base_url()}/api/chat",
+             json: body,
+             receive_timeout: timeout(),
+             retry: false
+           ) do
+        {:ok, %{status: 200, body: %{"message" => message} = response}} ->
+          # Build response with potential tool_calls
+          openai_response = build_tool_response(message, response, model_name)
+          {:ok, openai_response}
+
+        {:ok, %{status: status, body: body}} ->
+          Logger.warning("Ollama chat with tools failed: status=#{status}, body=#{inspect(body)}")
+
+          {:error, "Failed to get AI response. Please try again."}
+
+        {:error, exception} ->
+          Logger.warning("Ollama chat with tools error: #{Exception.message(exception)}")
+          {:error, "Failed to connect to Ollama. Please check if it is running."}
+      end
+    end)
+  end
+
+  # Convert OpenAI-format tools to Ollama format
+  defp convert_tools_to_ollama_format(tools) do
+    Enum.map(tools, fn tool ->
+      case tool do
+        %{"type" => "function", "function" => func} ->
+          %{
+            "type" => "function",
+            "function" => %{
+              "name" => func["name"],
+              "description" => func["description"] || "",
+              "parameters" => func["parameters"] || %{"type" => "object", "properties" => %{}}
+            }
+          }
+
+        # Already in correct format or other format
+        _other ->
+          tool
+      end
+    end)
+  end
+
+  # Build OpenAI-compatible response with tool_calls if present
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
+  defp build_tool_response(message, response, model_name) do
+    tool_calls = message["tool_calls"]
+
+    message_content = %{
+      "role" => message["role"] || "assistant",
+      "content" => message["content"] || ""
+    }
+
+    # Add tool_calls to message if present
+    message_with_tools =
+      if tool_calls && length(tool_calls) > 0 do
+        formatted_calls =
+          Enum.map(tool_calls, fn call ->
+            %{
+              "id" => call["id"] || generate_tool_call_id(),
+              "type" => "function",
+              "function" => %{
+                "name" => get_in(call, ["function", "name"]) || call["name"],
+                "arguments" =>
+                  get_in(call, ["function", "arguments"]) ||
+                    Jason.encode!(call["arguments"] || %{})
+              }
+            }
+          end)
+
+        Map.put(message_content, "tool_calls", formatted_calls)
+      else
+        message_content
+      end
+
+    finish_reason =
+      cond do
+        tool_calls && length(tool_calls) > 0 -> "tool_calls"
+        response["done"] -> "stop"
+        true -> nil
+      end
+
+    %{
+      "choices" => [
+        %{
+          "index" => 0,
+          "message" => message_with_tools,
+          "finish_reason" => finish_reason
+        }
+      ],
+      "model" => model_name,
+      "usage" => %{
+        "prompt_tokens" => response["prompt_eval_count"] || 0,
+        "completion_tokens" => response["eval_count"] || 0,
+        "total_tokens" => (response["prompt_eval_count"] || 0) + (response["eval_count"] || 0)
+      }
+    }
+  end
+
+  defp generate_tool_call_id do
+    Base.encode16("call_" <> :crypto.strong_rand_bytes(12), case: :lower)
+  end
+
+  @doc """
   Sends a chat completion request with streaming enabled.
   Protected by circuit breaker to prevent cascading failures.
 

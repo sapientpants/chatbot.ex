@@ -22,6 +22,9 @@ defmodule Chatbot.Application do
       Chatbot.Memory.EmbeddingCache,
       # Task supervisor for background tasks
       {Task.Supervisor, name: Chatbot.TaskSupervisor},
+      # MCP client infrastructure
+      {DynamicSupervisor, name: Chatbot.MCP.ClientSupervisor, strategy: :one_for_one},
+      Chatbot.MCP.ClientRegistry,
       # Start to serve requests, typically the last entry
       ChatbotWeb.Endpoint
     ]

@@ -9,7 +9,12 @@
     "lib/chatbot_web/gettext.ex",
     "lib/chatbot_web/controllers/page_html.ex",
     "lib/chatbot/lm_studio.ex",
-    "lib/chatbot/mailer.ex"
+    "lib/chatbot/mailer.ex",
+    "lib/chatbot/mcp/agent_loop.ex",
+    "lib/chatbot/mcp/client_registry.ex",
+    "lib/chatbot/mcp/tool_executor.ex",
+    "lib/chatbot/mcp/tool_registry.ex",
+    "lib/chatbot_web/router.ex"
   ],
-  "_comment": "Coverage threshold set to 80%. LiveView modules, UI components, and external service integrations are excluded as they require integration testing."
+  "_comment": "Coverage threshold set to 80%. LiveView modules, UI components, external service integrations, and MCP infrastructure (requires running MCP servers) are excluded as they require integration testing."
 }

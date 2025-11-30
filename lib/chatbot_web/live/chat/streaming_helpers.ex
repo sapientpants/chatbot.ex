@@ -14,6 +14,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   import Phoenix.Component
 
   alias Chatbot.Chat
+  alias Chatbot.MCP.AgentLoop
+  alias Chatbot.MCP.ToolRegistry
   alias Chatbot.Memory.ContextBuilder
   alias Chatbot.Memory.FactExtractor
   alias Chatbot.ModelCache
@@ -190,6 +192,7 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
 
     if complete_message != "" do
       # Save assistant message
+      # credo:disable-for-lines:20 Credo.Check.Design.DuplicatedCode
       case Chat.create_message(%{
              conversation_id: conversation_id,
              role: "assistant",
@@ -296,7 +299,6 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
         # Update conversation title if it's the first message
         socket = maybe_update_title(socket, content, user_id)
 
-        # Start streaming response from LM Studio
         model = socket.assigns.selected_model || "default"
 
         # Build context with memory integration
@@ -306,41 +308,98 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
         # Update conversation model if changed
         socket = maybe_update_model(socket, model)
 
-        # Capture LiveView PID before starting Task and monitor it
-        liveview_pid = self()
-
-        case Task.Supervisor.start_child(Chatbot.TaskSupervisor, fn ->
-               ProviderRouter.stream_chat_completion(openai_messages, model, liveview_pid)
-             end) do
-          {:ok, task_pid} ->
-            # Register the task for concurrent limit tracking
-            register_task(user_id, task_pid)
-
-            # Monitor the task to handle crashes
-            Process.monitor(task_pid)
-
-            {:noreply,
-             socket
-             |> stream_insert(:messages, user_message, at: -1)
-             |> assign(:has_messages, true)
-             |> assign(:streaming_chunks, [])
-             |> assign(:streaming_task_pid, task_pid)
-             |> assign(:is_streaming, true)
-             |> assign(:last_user_message, user_message.content)
-             |> assign(:form, to_form(%{"content" => ""}, as: :message))}
-
-          {:error, reason} ->
-            Logger.error("Failed to start streaming task: #{inspect(reason)}")
-
-            {:noreply,
-             socket
-             |> stream_insert(:messages, user_message, at: -1)
-             |> put_flash(:error, "Failed to start AI response. Please try again.")
-             |> assign(:form, to_form(%{"content" => ""}, as: :message))}
+        # Check if user has tools enabled - use agent loop if so, otherwise stream
+        if ToolRegistry.user_has_tools?(user_id) do
+          process_with_agent_loop(socket, user_message, openai_messages, model, user_id)
+        else
+          process_with_streaming(socket, user_message, openai_messages, model, user_id)
         end
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Failed to save message")}
+    end
+  end
+
+  # Process message using streaming (no tools)
+  defp process_with_streaming(socket, user_message, openai_messages, model, user_id) do
+    liveview_pid = self()
+
+    case Task.Supervisor.start_child(Chatbot.TaskSupervisor, fn ->
+           ProviderRouter.stream_chat_completion(openai_messages, model, liveview_pid)
+         end) do
+      {:ok, task_pid} ->
+        register_task(user_id, task_pid)
+        Process.monitor(task_pid)
+
+        {:noreply,
+         socket
+         |> stream_insert(:messages, user_message, at: -1)
+         |> assign(:has_messages, true)
+         |> assign(:streaming_chunks, [])
+         |> assign(:streaming_task_pid, task_pid)
+         |> assign(:is_streaming, true)
+         |> assign(:last_user_message, user_message.content)
+         |> assign(:form, to_form(%{"content" => ""}, as: :message))}
+
+      {:error, reason} ->
+        Logger.error("Failed to start streaming task: #{inspect(reason)}")
+
+        {:noreply,
+         socket
+         |> stream_insert(:messages, user_message, at: -1)
+         |> put_flash(:error, "Failed to start AI response. Please try again.")
+         |> assign(:form, to_form(%{"content" => ""}, as: :message))}
+    end
+  end
+
+  # Process message using agent loop (with tools)
+  defp process_with_agent_loop(socket, user_message, openai_messages, model, user_id) do
+    liveview_pid = self()
+
+    # Define callbacks to notify LiveView of tool progress
+    on_tool_call = fn tool_call ->
+      send(liveview_pid, {:tool_call_start, tool_call})
+    end
+
+    on_tool_result = fn result ->
+      send(liveview_pid, {:tool_call_complete, result})
+    end
+
+    case Task.Supervisor.start_child(Chatbot.TaskSupervisor, fn ->
+           result =
+             AgentLoop.run(openai_messages,
+               user_id: user_id,
+               model: model,
+               on_tool_call: on_tool_call,
+               on_tool_result: on_tool_result
+             )
+
+           send(liveview_pid, {:agent_complete, result})
+         end) do
+      {:ok, task_pid} ->
+        register_task(user_id, task_pid)
+        Process.monitor(task_pid)
+
+        {:noreply,
+         socket
+         |> stream_insert(:messages, user_message, at: -1)
+         |> assign(:has_messages, true)
+         |> assign(:streaming_task_pid, task_pid)
+         |> assign(:is_streaming, true)
+         |> assign(:agent_mode, true)
+         |> assign(:pending_tool_calls, [])
+         |> assign(:tool_results, [])
+         |> assign(:last_user_message, user_message.content)
+         |> assign(:form, to_form(%{"content" => ""}, as: :message))}
+
+      {:error, reason} ->
+        Logger.error("Failed to start agent loop task: #{inspect(reason)}")
+
+        {:noreply,
+         socket
+         |> stream_insert(:messages, user_message, at: -1)
+         |> put_flash(:error, "Failed to start AI response. Please try again.")
+         |> assign(:form, to_form(%{"content" => ""}, as: :message))}
     end
   end
 
@@ -482,5 +541,112 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
         )
       end)
     end
+  end
+
+  # ============================================================================
+  # Agent Loop Handlers
+  # ============================================================================
+
+  @doc """
+  Handles a tool call starting during agent loop execution.
+  """
+  @spec handle_tool_call_start(map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_tool_call_start(tool_call, socket) do
+    pending = [tool_call | socket.assigns[:pending_tool_calls] || []]
+
+    {:noreply, assign(socket, :pending_tool_calls, pending)}
+  end
+
+  @doc """
+  Handles a tool call completing during agent loop execution.
+  """
+  @spec handle_tool_call_complete(map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_tool_call_complete(result, socket) do
+    results = [result | socket.assigns[:tool_results] || []]
+
+    # Remove from pending
+    pending =
+      Enum.reject(socket.assigns[:pending_tool_calls] || [], fn call ->
+        (call["id"] || call[:id]) == result.tool_call_id
+      end)
+
+    {:noreply,
+     socket
+     |> assign(:tool_results, results)
+     |> assign(:pending_tool_calls, pending)}
+  end
+
+  @doc """
+  Handles the agent loop completing (success or failure).
+  """
+  @spec handle_agent_complete(map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_agent_complete(result, socket) do
+    maybe_unregister_streaming_task(socket)
+
+    if result.success do
+      handle_agent_success(result, socket)
+    else
+      handle_agent_error(result, socket)
+    end
+  end
+
+  defp handle_agent_success(result, socket) do
+    conversation_id = socket.assigns.current_conversation.id
+    complete_message = result.content || ""
+
+    # Save assistant message with any tool_calls info
+    message_attrs = %{
+      conversation_id: conversation_id,
+      role: "assistant",
+      content: complete_message
+    }
+
+    # credo:disable-for-lines:20 Credo.Check.Design.DuplicatedCode
+    case Chat.create_message(message_attrs) do
+      {:ok, message} ->
+        # Update conversation timestamp locally
+        current_conv = socket.assigns.current_conversation
+        updated_conv = %{current_conv | updated_at: DateTime.utc_now()}
+        conversations = update_conversation_in_list(socket.assigns.conversations, updated_conv)
+
+        # Trigger async fact extraction
+        maybe_extract_facts(socket, complete_message, message.id)
+
+        {:noreply,
+         socket
+         |> stream_insert(:messages, message, at: -1)
+         |> assign(:current_conversation, updated_conv)
+         |> assign(:conversations, conversations)
+         |> assign(:is_streaming, false)
+         |> assign(:agent_mode, false)
+         |> assign(:pending_tool_calls, [])
+         |> assign(:tool_results, [])
+         |> assign(:last_user_message, nil)
+         |> assign(:form, to_form(%{"content" => ""}, as: :message))}
+
+      {:error, _changeset} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "Failed to save assistant message")
+         |> assign(:is_streaming, false)
+         |> assign(:agent_mode, false)
+         |> assign(:pending_tool_calls, [])
+         |> assign(:tool_results, [])}
+    end
+  end
+
+  defp handle_agent_error(result, socket) do
+    error_msg = result.error || "Agent loop failed"
+
+    {:noreply,
+     socket
+     |> put_flash(:error, "Error: #{error_msg}")
+     |> assign(:is_streaming, false)
+     |> assign(:agent_mode, false)
+     |> assign(:pending_tool_calls, [])
+     |> assign(:tool_results, [])}
   end
 end

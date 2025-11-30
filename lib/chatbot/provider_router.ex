@@ -92,6 +92,44 @@ defmodule Chatbot.ProviderRouter do
     end
   end
 
+  @doc """
+  Sends a non-streaming chat completion request with tool definitions.
+
+  This is used for tool-enabled conversations where the LLM may return
+  tool_calls that need to be executed.
+
+  ## Parameters
+    - messages: List of messages in OpenAI format
+    - tools: List of tool definitions in OpenAI format
+    - opts: Keyword options
+      - `:model` - Model name with optional provider prefix (required)
+
+  ## Returns
+    - `{:ok, response}` with the completion including potential tool_calls
+    - `{:error, reason}` on failure
+
+  ## Examples
+
+      tools = [%{"type" => "function", "function" => %{"name" => "get_weather", ...}}]
+      {:ok, response} = chat_completion_with_tools(messages, tools, model: "ollama/llama3")
+
+  """
+  @spec chat_completion_with_tools(messages(), [map()], keyword()) ::
+          {:ok, map()} | {:error, String.t()}
+  def chat_completion_with_tools(messages, tools, opts) do
+    model = Keyword.fetch!(opts, :model)
+    {provider, model_name} = parse_model(model)
+
+    case provider do
+      :ollama ->
+        ollama_client().chat_with_tools(messages, tools, model_name)
+
+      :lmstudio ->
+        # LM Studio may support tools through OpenAI-compatible API
+        lm_studio_client().chat_with_tools(messages, tools, model_name)
+    end
+  end
+
   # ============================================================================
   # Embedding Functions
   # ============================================================================

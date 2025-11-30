@@ -124,6 +124,95 @@ defmodule ChatbotWeb.CoreComponents do
   end
 
   @doc """
+  Renders a modal dialog.
+
+  ## Examples
+
+      <.modal id="confirm-modal" show={@show_modal}>
+        <p>Are you sure?</p>
+      </.modal>
+  """
+  attr :id, :string, required: true
+  attr :show, :boolean, default: false
+  attr :on_cancel, JS, default: %JS{}
+
+  slot :inner_block, required: true
+
+  @spec modal(map()) :: Phoenix.LiveView.Rendered.t()
+  def modal(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      phx-mounted={@show && show_modal(@id)}
+      phx-remove={hide_modal(@id)}
+      data-cancel={JS.exec(@on_cancel, "phx-remove")}
+      class="relative z-50 hidden"
+    >
+      <div id={"#{@id}-bg"} class="bg-black/60 fixed inset-0 transition-opacity" aria-hidden="true" />
+      <div
+        class="fixed inset-0 overflow-y-auto"
+        aria-labelledby={"#{@id}-title"}
+        aria-describedby={"#{@id}-description"}
+        role="dialog"
+        aria-modal="true"
+        tabindex="0"
+      >
+        <div class="flex min-h-full items-center justify-center p-4">
+          <div class="w-full max-w-lg p-6 relative rounded-xl bg-base-100 shadow-xl border border-base-content/10">
+            <button
+              phx-click={JS.exec("data-cancel", to: "##{@id}")}
+              type="button"
+              class="absolute top-4 right-4 text-base-content/50 hover:text-base-content"
+              aria-label={gettext("close")}
+            >
+              <.icon name="hero-x-mark" class="size-5" />
+            </button>
+            <div id={"#{@id}-content"}>
+              {render_slot(@inner_block)}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Renders a simple form with standard styling.
+
+  ## Examples
+
+      <.simple_form for={@form} phx-submit="save">
+        <.input field={@form[:name]} label="Name" />
+        <:actions>
+          <.button>Save</.button>
+        </:actions>
+      </.simple_form>
+  """
+  attr :for, :any, required: true, doc: "the data structure for the form"
+  attr :as, :any, default: nil, doc: "the server side parameter to collect all input under"
+
+  attr :rest, :global,
+    include: ~w(autocomplete name rel action enctype method novalidate target multipart)
+
+  slot :inner_block, required: true
+  slot :actions, doc: "the slot for form actions, such as a submit button"
+
+  @spec simple_form(map()) :: Phoenix.LiveView.Rendered.t()
+  def simple_form(assigns) do
+    ~H"""
+    <.form :let={f} for={@for} as={@as} {@rest}>
+      <div class="space-y-4">
+        {render_slot(@inner_block, f)}
+        <div :for={action <- @actions} class="flex items-center justify-end gap-3 mt-6">
+          {render_slot(action, f)}
+        </div>
+      </div>
+    </.form>
+    """
+  end
+
+  @doc """
   Renders an input with label and error messages.
 
   A `Phoenix.HTML.FormField` may be passed as argument,
@@ -487,6 +576,50 @@ defmodule ChatbotWeb.CoreComponents do
   end
 
   ## JS Commands
+
+  @doc """
+  Shows a modal by ID.
+  """
+  @spec show_modal(String.t()) :: JS.t()
+  def show_modal(id) when is_binary(id) do
+    %JS{}
+    |> JS.show(to: "##{id}")
+    |> JS.show(
+      to: "##{id}-bg",
+      time: 300,
+      transition: {"transition-all ease-out duration-300", "opacity-0", "opacity-100"}
+    )
+    |> JS.show(
+      to: "##{id}-content",
+      time: 300,
+      transition:
+        {"transition-all ease-out duration-300",
+         "opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95",
+         "opacity-100 translate-y-0 sm:scale-100"}
+    )
+    |> JS.focus_first(to: "##{id}-content")
+  end
+
+  @doc """
+  Hides a modal by ID.
+  """
+  @spec hide_modal(String.t()) :: JS.t()
+  def hide_modal(id) when is_binary(id) do
+    %JS{}
+    |> JS.hide(
+      to: "##{id}-bg",
+      transition: {"transition-all ease-in duration-200", "opacity-100", "opacity-0"}
+    )
+    |> JS.hide(
+      to: "##{id}-content",
+      time: 200,
+      transition:
+        {"transition-all ease-in duration-200", "opacity-100 translate-y-0 sm:scale-100",
+         "opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"}
+    )
+    |> JS.hide(to: "##{id}", transition: {"block", "block", "hidden"})
+    |> JS.pop_focus()
+  end
 
   @doc """
   Shows an element with animation transition.
