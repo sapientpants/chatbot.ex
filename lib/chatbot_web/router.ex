@@ -74,6 +74,7 @@ defmodule ChatbotWeb.Router do
       live "/chat", ChatLive.Index
       live "/chat/:id", ChatLive.Show
       live "/settings", SettingsLive
+      live "/settings/tools", ToolsSettingsLive
     end
 
     delete "/logout", UserSessionController, :delete

@@ -95,7 +95,10 @@ defmodule Chatbot.MixProject do
       {:excoveralls, "~> 0.18", only: :test},
       {:mox, "~> 1.0", only: :test},
       {:bypass, "~> 2.1", only: :test},
-      {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false}
+      {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
+      # MCP tool calling
+      {:anubis_mcp, "~> 0.16.0"},
+      {:ollama, "~> 0.9.0"}
     ]
   end
 

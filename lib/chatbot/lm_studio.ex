@@ -263,6 +263,7 @@ defmodule Chatbot.LMStudio do
         temperature: 0.7
       }
 
+      # credo:disable-for-lines:20 Credo.Check.Design.DuplicatedCode
       case Req.post("#{base_url()}/chat/completions", json: body, retry: false) do
         {:ok, %{status: 200, body: response}} ->
           {:ok, response}
@@ -276,6 +277,51 @@ defmodule Chatbot.LMStudio do
 
         {:error, exception} ->
           Logger.warning("LM Studio chat completion error: #{Exception.message(exception)}")
+          {:error, "Failed to connect to LM Studio. Please check if it is running."}
+      end
+    end)
+  end
+
+  @doc """
+  Sends a non-streaming chat completion request with tool definitions.
+
+  LM Studio supports OpenAI-compatible tool calling through its API.
+
+  ## Parameters
+    - messages: List of messages in OpenAI format
+    - tools: List of tool definitions in OpenAI format
+    - model: Model name to use (with or without `lmstudio/` prefix)
+
+  ## Returns
+    - `{:ok, response}` with the completion, potentially including tool_calls
+    - `{:error, reason}` on failure
+  """
+  @spec chat_with_tools(messages(), [map()], String.t()) :: {:ok, map()} | {:error, String.t()}
+  def chat_with_tools(messages, tools, model) do
+    with_circuit_breaker(fn ->
+      model_name = strip_provider_prefix(model)
+
+      body = %{
+        model: model_name,
+        messages: messages,
+        tools: tools,
+        temperature: 0.7
+      }
+
+      # credo:disable-for-lines:20 Credo.Check.Design.DuplicatedCode
+      case Req.post("#{base_url()}/chat/completions", json: body, retry: false) do
+        {:ok, %{status: 200, body: response}} ->
+          {:ok, response}
+
+        {:ok, %{status: status, body: body}} ->
+          Logger.warning(
+            "LM Studio chat with tools failed: status=#{status}, body=#{inspect(body)}"
+          )
+
+          {:error, "Failed to get AI response. Please try again."}
+
+        {:error, exception} ->
+          Logger.warning("LM Studio chat with tools error: #{Exception.message(exception)}")
           {:error, "Failed to connect to LM Studio. Please check if it is running."}
       end
     end)
