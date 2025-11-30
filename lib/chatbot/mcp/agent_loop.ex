@@ -232,7 +232,6 @@ defmodule Chatbot.MCP.AgentLoop do
         :timeout -> "Total timeout exceeded"
         :empty_response -> "LLM returned empty response"
         {:llm_error, err} -> "LLM error: #{inspect(err)}"
-        other -> "Unknown error: #{inspect(other)}"
       end
 
     %{
@@ -251,7 +250,7 @@ defmodule Chatbot.MCP.AgentLoop do
   end
 
   defp run_without_tools(messages, model) do
-    case Chatbot.ProviderRouter.chat_completion(messages, model: model) do
+    case Chatbot.ProviderRouter.chat_completion(messages, model) do
       {:ok, response} ->
         content = extract_content(response)
 
