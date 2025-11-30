@@ -16,19 +16,7 @@ defmodule ChatbotWeb.UserSessionController do
     %{"email" => email, "password" => password} = user_params
 
     case Accounts.get_user_by_email_and_password(email, password) do
-      %{confirmed_at: nil} = _user ->
-        # User exists but hasn't confirmed their email
-        conn
-        |> put_flash(
-          :error,
-          "Please confirm your email before logging in. " <>
-            "Check your inbox or request a new confirmation link."
-        )
-        |> put_flash(:email, String.slice(email, 0, 160))
-        |> redirect(to: ~p"/login")
-
       %{} = user ->
-        # User is confirmed, proceed with login
         UserAuth.log_in_user(conn, user, user_params)
 
       nil ->

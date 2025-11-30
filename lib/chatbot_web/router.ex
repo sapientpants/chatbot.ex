@@ -65,17 +65,6 @@ defmodule ChatbotWeb.Router do
     post "/login", UserSessionController, :create
   end
 
-  # Email confirmation routes (accessible without authentication)
-  scope "/", ChatbotWeb do
-    pipe_through :browser
-
-    live_session :email_confirmation do
-      # Order matters: specific route before parameterized route
-      live "/confirm/resend", ConfirmationInstructionsLive
-      live "/confirm/:token", ConfirmationLive
-    end
-  end
-
   # Authenticated routes
   scope "/", ChatbotWeb do
     pipe_through [:browser, :require_authenticated_user]
