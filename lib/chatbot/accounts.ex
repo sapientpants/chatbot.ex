@@ -6,7 +6,6 @@ defmodule Chatbot.Accounts do
   import Ecto.Query, warn: false
 
   alias Chatbot.Accounts.User
-  alias Chatbot.Accounts.UserNotifier
   alias Chatbot.Accounts.UserToken
   alias Chatbot.PII
   alias Chatbot.Repo
@@ -14,6 +13,22 @@ defmodule Chatbot.Accounts do
   require Logger
 
   ## User registration
+
+  @doc """
+  Checks if any user exists in the system.
+
+  Used for first-user-only registration flow.
+
+  ## Examples
+
+      iex> user_exists?()
+      true
+
+  """
+  @spec user_exists?() :: boolean()
+  def user_exists? do
+    Repo.exists?(User)
+  end
 
   @doc """
   Registers a user.
@@ -288,66 +303,5 @@ defmodule Chatbot.Accounts do
   @spec get_user_by_email(String.t()) :: User.t() | nil
   def get_user_by_email(email) when is_binary(email) do
     Repo.get_by(User, email: email)
-  end
-
-  ## Email confirmation
-
-  @doc ~S"""
-  Delivers the confirmation email instructions to the given user.
-
-  ## Examples
-
-      iex> deliver_user_confirmation_instructions(user, &url(~p"/confirm/#{&1}"))
-      {:ok, %{to: ..., body: ...}}
-
-      iex> deliver_user_confirmation_instructions(confirmed_user, &url(~p"/confirm/#{&1}"))
-      {:error, :already_confirmed}
-
-  """
-  @spec deliver_user_confirmation_instructions(User.t(), (String.t() -> String.t())) ::
-          {:ok, map()} | {:error, :already_confirmed}
-  def deliver_user_confirmation_instructions(%User{} = user, confirmation_url_fun)
-      when is_function(confirmation_url_fun, 1) do
-    if user.confirmed_at do
-      {:error, :already_confirmed}
-    else
-      {encoded_token, user_token} = UserToken.build_email_token(user, "confirm")
-      Repo.insert!(user_token)
-      UserNotifier.deliver_confirmation_instructions(user, confirmation_url_fun.(encoded_token))
-    end
-  end
-
-  @doc """
-  Confirms a user by the given token.
-
-  If the token matches, the user account is marked as confirmed
-  and the token is deleted.
-
-  ## Examples
-
-      iex> confirm_user("valid_token")
-      {:ok, %User{}}
-
-      iex> confirm_user("invalid_token")
-      :error
-
-  """
-  @spec confirm_user(String.t()) :: {:ok, User.t()} | :error
-  def confirm_user(token) do
-    with {:ok, query} <- UserToken.verify_email_token_query(token, "confirm"),
-         %User{} = user <- Repo.one(query),
-         {:ok, %{user: user}} <- Repo.transaction(confirm_user_multi(user)) do
-      {:ok, user}
-    else
-      _error -> :error
-    end
-  end
-
-  # Dialyzer has issues with Ecto.Multi's opaque types in pipelines
-  @dialyzer {:nowarn_function, confirm_user_multi: 1}
-  defp confirm_user_multi(user) do
-    Ecto.Multi.new()
-    |> Ecto.Multi.update(:user, User.confirm_changeset(user))
-    |> Ecto.Multi.delete_all(:tokens, UserToken.by_user_and_contexts_query(user, ["confirm"]))
   end
 end

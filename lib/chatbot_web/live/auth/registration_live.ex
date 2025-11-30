@@ -135,21 +135,29 @@ defmodule ChatbotWeb.RegistrationLive do
   @spec mount(map(), map(), Phoenix.LiveView.Socket.t()) ::
           {:ok, Phoenix.LiveView.Socket.t(), keyword()}
   def mount(_params, _session, socket) do
-    changeset = Accounts.change_user_registration(%User{})
+    # First-user-only registration: redirect if a user already exists
+    if Accounts.user_exists?() do
+      {:ok,
+       socket
+       |> put_flash(:error, "Registration is closed. Please log in with your existing account.")
+       |> redirect(to: ~p"/login")}
+    else
+      changeset = Accounts.change_user_registration(%User{})
 
-    # Get IP address during mount when connect_info is available
-    ip =
-      case get_connect_info(socket, :peer_data) do
-        %{address: address} -> address |> Tuple.to_list() |> Enum.join(".")
-        _error -> "unknown"
-      end
+      # Get IP address during mount when connect_info is available
+      ip =
+        case get_connect_info(socket, :peer_data) do
+          %{address: address} -> address |> Tuple.to_list() |> Enum.join(".")
+          _error -> "unknown"
+        end
 
-    socket =
-      socket
-      |> assign(trigger_submit: false, check_errors: false, client_ip: ip, show_password: false)
-      |> assign_form(changeset)
+      socket =
+        socket
+        |> assign(trigger_submit: false, check_errors: false, client_ip: ip, show_password: false)
+        |> assign_form(changeset)
 
-    {:ok, socket, temporary_assigns: [form: nil]}
+      {:ok, socket, temporary_assigns: [form: nil]}
+    end
   end
 
   @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
@@ -165,20 +173,10 @@ defmodule ChatbotWeb.RegistrationLive do
     case RateLimiter.check_registration_rate_limit(ip) do
       :ok ->
         case Accounts.register_user(user_params) do
-          {:ok, user} ->
-            # Send confirmation email
-            {:ok, _email} =
-              Accounts.deliver_user_confirmation_instructions(
-                user,
-                &url(~p"/confirm/#{&1}")
-              )
-
+          {:ok, _user} ->
             {:noreply,
              socket
-             |> put_flash(
-               :info,
-               "Account created! Please check your email to confirm your account."
-             )
+             |> put_flash(:info, "Account created successfully! Please log in.")
              |> redirect(to: ~p"/login")}
 
           {:error, %Ecto.Changeset{} = changeset} ->

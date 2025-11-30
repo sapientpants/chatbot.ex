@@ -2,43 +2,12 @@ defmodule Chatbot.Accounts.UserNotifier do
   @moduledoc """
   Notification functions for user-related emails.
 
-  In development, emails are logged to the console.
-  In production, you would use Swoosh or another email library.
+  For this single-user local app, notifications are logged to the console.
   """
 
   alias Chatbot.PII
 
   require Logger
-
-  @doc """
-  Delivers email confirmation instructions to the given user.
-
-  ## Examples
-
-      iex> deliver_confirmation_instructions(user, "http://example.com/confirm/token")
-      {:ok, %{to: user.email, body: "..."}}
-
-  """
-  @spec deliver_confirmation_instructions(Chatbot.Accounts.User.t(), String.t()) :: {:ok, map()}
-  def deliver_confirmation_instructions(user, url) do
-    Logger.info("""
-    ==============================
-    Email Confirmation Instructions
-    ==============================
-    Hi #{PII.mask_email(user.email)},
-
-    You can confirm your account by visiting the URL below:
-
-    #{url}
-
-    If you didn't create an account with us, please ignore this message.
-
-    This link will expire in 7 days.
-    ==============================
-    """)
-
-    {:ok, %{to: user.email, body: "Confirmation instructions sent"}}
-  end
 
   @doc """
   Delivers password reset instructions to the given user.

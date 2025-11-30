@@ -60,6 +60,7 @@ defmodule Chatbot.Accounts.User do
     |> validate_email(opts)
     |> validate_password(opts)
     |> maybe_put_uuid()
+    |> put_change(:confirmed_at, DateTime.utc_now(:second))
   end
 
   defp validate_email(changeset, opts) do
