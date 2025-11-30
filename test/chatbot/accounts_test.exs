@@ -63,7 +63,16 @@ defmodule Chatbot.AccountsTest do
     test "auto-confirms users on registration" do
       email = unique_user_email()
       {:ok, user} = Accounts.register_user(valid_user_attributes(email: email))
-      assert user.confirmed_at != nil
+      assert %DateTime{} = user.confirmed_at
+    end
+
+    test "rejects registration when a user already exists" do
+      # First user succeeds
+      {:ok, _user} = Accounts.register_user(valid_user_attributes())
+
+      # Second user fails
+      {:error, changeset} = Accounts.register_user(valid_user_attributes())
+      assert "Registration is closed" in errors_on(changeset).base
     end
   end
 

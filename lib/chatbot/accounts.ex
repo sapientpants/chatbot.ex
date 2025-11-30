@@ -33,6 +33,9 @@ defmodule Chatbot.Accounts do
   @doc """
   Registers a user.
 
+  This is a single-user application - only the first user can register.
+  Subsequent registration attempts will fail with a changeset error.
+
   ## Examples
 
       iex> register_user(%{field: value})
@@ -44,9 +47,17 @@ defmodule Chatbot.Accounts do
   """
   @spec register_user(map()) :: {:ok, User.t()} | {:error, Ecto.Changeset.t()}
   def register_user(attrs) do
-    %User{}
-    |> User.registration_changeset(attrs)
-    |> Repo.insert()
+    # Enforce first-user-only at the database level to prevent race conditions
+    if user_exists?() do
+      {:error,
+       %User{}
+       |> User.registration_changeset(attrs)
+       |> Ecto.Changeset.add_error(:base, "Registration is closed")}
+    else
+      %User{}
+      |> User.registration_changeset(attrs)
+      |> Repo.insert()
+    end
   end
 
   @doc """
