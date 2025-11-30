@@ -14,6 +14,6 @@ defmodule Chatbot.Repo.Migrations.AddToolCallsToMessages do
       add :tool_duration_ms, :integer
     end
 
-    create index(:messages, [:conversation_id, :tool_call_id])
+    create index(:messages, [:conversation_id, :tool_call_id], where: "tool_call_id IS NOT NULL")
   end
 end
