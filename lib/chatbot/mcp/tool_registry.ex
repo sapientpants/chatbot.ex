@@ -168,9 +168,10 @@ defmodule Chatbot.MCP.ToolRegistry do
     end
   end
 
+  # Use shared function from ClientRegistry for consistent module naming
+  # See ClientRegistry.client_module_name/1 for security documentation
   defp get_client_module(server_id) do
-    # credo:disable-for-next-line Credo.Check.Warning.UnsafeToAtom
-    Module.concat([Chatbot.MCP.Client, "Server_#{String.replace(server_id, "-", "_")}"])
+    ClientRegistry.client_module_name(server_id)
   end
 
   defp filter_enabled_tools(tools, user_id, server_id) do

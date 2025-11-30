@@ -69,28 +69,34 @@ defmodule Chatbot.MCP.ToolExecutor do
   Executes multiple tool calls in parallel and returns all results.
   """
   @spec execute_all([tool_call()], binary(), keyword()) :: [tool_result()]
-  # credo:disable-for-lines:25 Credo.Check.Refactor.DoubleBooleanNegation
-  # credo:disable-for-lines:25 Credo.Check.Refactor.MapMap
-  # Two separate maps needed: first to start all tasks in parallel, then to collect results
   def execute_all(tool_calls, user_id, opts \\ []) do
-    tool_calls
-    |> Enum.map(fn tool_call ->
-      Task.Supervisor.async_nolink(Chatbot.TaskSupervisor, fn ->
-        execute(tool_call, user_id, opts)
-      end)
-    end)
-    |> Enum.map(fn task ->
-      timeout = opts[:timeout] || config(:tool_timeout_ms) || @default_timeout
+    timeout = opts[:timeout] || config(:tool_timeout_ms) || @default_timeout
 
+    # Start all tasks in parallel, keeping reference to original tool_call
+    tasks_with_calls =
+      Enum.map(tool_calls, fn tool_call ->
+        task =
+          Task.Supervisor.async_nolink(Chatbot.TaskSupervisor, fn ->
+            execute(tool_call, user_id, opts)
+          end)
+
+        {task, tool_call}
+      end)
+
+    # Collect results, using original tool_call info on timeout
+    Enum.map(tasks_with_calls, fn {task, tool_call} ->
       case Task.yield(task, timeout) || Task.shutdown(task) do
         {:ok, result} ->
           result
 
         nil ->
-          # Task timed out
+          # Task timed out - use original tool_call info for error reporting
+          tool_id = tool_call["id"] || tool_call[:id] || "unknown"
+          tool_name = tool_call["name"] || tool_call[:name] || "unknown"
+
           %{
-            tool_call_id: "unknown",
-            tool_name: "unknown",
+            tool_call_id: tool_id,
+            tool_name: tool_name,
             result: nil,
             error: "Tool execution timed out",
             duration_ms: timeout
@@ -156,10 +162,10 @@ defmodule Chatbot.MCP.ToolExecutor do
     end
   end
 
-  # Dynamically created module names for MCP clients - intentional atom creation
+  # Use shared function from ClientRegistry for consistent module naming
+  # See ClientRegistry.client_module_name/1 for security documentation
   defp get_client_module(server_id) do
-    # credo:disable-for-next-line Credo.Check.Warning.UnsafeToAtom
-    Module.concat([Chatbot.MCP.Client, "Server_#{String.replace(server_id, "-", "_")}"])
+    ClientRegistry.client_module_name(server_id)
   end
 
   defp build_result(id, name, {:ok, result}, duration_ms) do

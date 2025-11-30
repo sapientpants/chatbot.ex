@@ -82,6 +82,23 @@ defmodule Chatbot.MCP.ClientRegistry do
     :ok
   end
 
+  @doc """
+  Returns the dynamically generated module name for an MCP client.
+
+  ## Security Note
+  This function creates atoms from server IDs. This is safe because:
+  - Server IDs are database-generated UUIDs, not user input
+  - The number of atoms is bounded by the number of servers in the database
+  - Invalid or malicious IDs cannot be injected since they must exist in the DB first
+
+  The module name follows the pattern: `Chatbot.MCP.Client.Server_<uuid_with_underscores>`
+  """
+  @spec client_module_name(binary()) :: module()
+  def client_module_name(server_id) do
+    # credo:disable-for-next-line Credo.Check.Warning.UnsafeToAtom
+    Module.concat([Chatbot.MCP.Client, "Server_#{String.replace(server_id, "-", "_")}"])
+  end
+
   # ============================================================================
   # GenServer Callbacks
   # ============================================================================
@@ -183,12 +200,6 @@ defmodule Chatbot.MCP.ClientRegistry do
 
   defp build_transport_config(%{transport_type: "http"} = server) do
     {:streamable_http, base_url: server.base_url, headers: Map.to_list(server.headers || %{})}
-  end
-
-  defp client_module_name(server_id) do
-    # Create a unique atom for this server's client module
-    # credo:disable-for-next-line Credo.Check.Warning.UnsafeToAtom
-    Module.concat([Chatbot.MCP.Client, "Server_#{String.replace(server_id, "-", "_")}"])
   end
 
   defp define_client_module(module_name) do

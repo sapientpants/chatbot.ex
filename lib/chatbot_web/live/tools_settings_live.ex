@@ -323,10 +323,15 @@ defmodule ChatbotWeb.ToolsSettingsLive do
     Server.changeset(%Server{}, params)
   end
 
+  # TODO: Implement tool fetching from MCP servers
+  # Currently returns empty list because:
+  # 1. Tools require an active connection to the MCP server
+  # 2. The server process is managed by ClientRegistry and may not be running
+  # 3. Future implementation should:
+  #    - Call ClientRegistry.get_client/1 to ensure server is connected
+  #    - Use ToolRegistry.get_server_tools/1 to fetch available tools
+  #    - Handle connection errors gracefully in the UI
   defp fetch_server_tools(_server) do
-    # For now, return empty list - tools will be fetched when server is connected
-    # In a real implementation, we'd connect to the server and call list_tools
-    # This would require the server to be running
     []
   end
 

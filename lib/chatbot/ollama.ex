@@ -448,7 +448,9 @@ defmodule Chatbot.Ollama do
     end)
   end
 
-  # Convert OpenAI-format tools to Ollama format
+  # Converts OpenAI-format tools to Ollama format.
+  # This is kept private as it's an internal implementation detail for API compatibility.
+  # Ollama uses the same tool format as OpenAI, but we normalize to ensure consistency.
   defp convert_tools_to_ollama_format(tools) do
     Enum.map(tools, fn tool ->
       case tool do
@@ -462,9 +464,11 @@ defmodule Chatbot.Ollama do
             }
           }
 
-        # Already in correct format or other format
-        _other ->
-          tool
+        # Pass through tools that are already in the correct format or have unknown structure.
+        # Log at debug level to help identify unexpected formats during development.
+        other ->
+          Logger.debug("Tool passed through without conversion: #{inspect(other)}")
+          other
       end
     end)
   end

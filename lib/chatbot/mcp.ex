@@ -251,10 +251,11 @@ defmodule Chatbot.MCP do
   @spec user_has_tools_enabled?(binary()) :: boolean()
   def user_has_tools_enabled?(user_id) do
     servers = list_servers_for_user(user_id)
+    # Fetch configs once outside the loop to avoid N+1 queries
+    all_configs = list_user_tool_configs(user_id)
 
     Enum.any?(servers, fn server ->
-      configs = list_user_tool_configs(user_id)
-      server_configs = Enum.filter(configs, &(&1.mcp_server_id == server.id))
+      server_configs = Enum.filter(all_configs, &(&1.mcp_server_id == server.id))
 
       case server_configs do
         [] -> true
