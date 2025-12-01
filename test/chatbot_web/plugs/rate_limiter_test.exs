@@ -209,4 +209,83 @@ defmodule ChatbotWeb.Plugs.RateLimiterTest do
       assert RateLimiter.check_registration_rate_limit(ip2) == :ok
     end
   end
+
+  describe "get_ip/1 security" do
+    test "uses remote_ip when no X-Forwarded-For header" do
+      conn = %Plug.Conn{
+        remote_ip: {8, 8, 8, 8},
+        req_headers: []
+      }
+
+      assert RateLimiter.get_ip(conn) == "8.8.8.8"
+    end
+
+    test "trusts X-Forwarded-For from trusted proxy (loopback)" do
+      conn = %Plug.Conn{
+        remote_ip: {127, 0, 0, 1},
+        req_headers: [{"x-forwarded-for", "203.0.113.50"}]
+      }
+
+      assert RateLimiter.get_ip(conn) == "203.0.113.50"
+    end
+
+    test "trusts X-Forwarded-For from trusted proxy (private network)" do
+      conn = %Plug.Conn{
+        remote_ip: {10, 0, 0, 1},
+        req_headers: [{"x-forwarded-for", "198.51.100.25"}]
+      }
+
+      assert RateLimiter.get_ip(conn) == "198.51.100.25"
+    end
+
+    test "ignores X-Forwarded-For from untrusted public IP" do
+      # Public IP trying to spoof X-Forwarded-For should be ignored
+      conn = %Plug.Conn{
+        remote_ip: {203, 0, 113, 1},
+        req_headers: [{"x-forwarded-for", "1.2.3.4"}]
+      }
+
+      # Should return the actual remote_ip, not the spoofed header
+      assert RateLimiter.get_ip(conn) == "203.0.113.1"
+    end
+
+    test "handles multiple IPs in X-Forwarded-For from trusted proxy" do
+      conn = %Plug.Conn{
+        remote_ip: {192, 168, 1, 1},
+        req_headers: [{"x-forwarded-for", "203.0.113.50, 10.0.0.1, 192.168.1.1"}]
+      }
+
+      # Should use the first valid IP (the original client)
+      assert RateLimiter.get_ip(conn) == "203.0.113.50"
+    end
+
+    test "rejects invalid IP in X-Forwarded-For header" do
+      conn = %Plug.Conn{
+        remote_ip: {127, 0, 0, 1},
+        req_headers: [{"x-forwarded-for", "invalid-ip, not-an-ip"}]
+      }
+
+      # Should fall back to remote_ip since no valid IP in header
+      assert RateLimiter.get_ip(conn) == "127.0.0.1"
+    end
+
+    test "finds first valid IP when header contains mix of valid and invalid" do
+      conn = %Plug.Conn{
+        remote_ip: {127, 0, 0, 1},
+        req_headers: [{"x-forwarded-for", "invalid, 203.0.113.50, 10.0.0.1"}]
+      }
+
+      # Should skip invalid and use first valid IP
+      assert RateLimiter.get_ip(conn) == "203.0.113.50"
+    end
+
+    test "handles IPv6 remote_ip" do
+      conn = %Plug.Conn{
+        remote_ip: {0, 0, 0, 0, 0, 0, 0, 1},
+        req_headers: []
+      }
+
+      assert RateLimiter.get_ip(conn) == "0:0:0:0:0:0:0:1"
+    end
+  end
 end

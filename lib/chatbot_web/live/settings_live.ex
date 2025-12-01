@@ -64,25 +64,33 @@ defmodule ChatbotWeb.SettingsLive do
   def handle_event("save", %{"settings" => params}, socket) do
     socket = assign(socket, :saving, true)
 
-    case Settings.set_many(params) do
-      :ok ->
-        # Clear model cache so new settings take effect
-        ModelCache.clear()
+    # Validate URLs before saving
+    with :ok <- validate_url_settings(params),
+         :ok <- Settings.set_many(params) do
+      # Clear model cache so new settings take effect
+      ModelCache.clear()
 
-        # Reload settings
-        settings = Settings.all()
+      # Reload settings
+      settings = Settings.all()
 
-        socket =
-          socket
-          |> assign(:settings, settings)
-          |> assign(:form, to_form(settings, as: :settings))
-          |> assign(:saving, false)
-          |> put_flash(:info, "Settings saved successfully")
+      socket =
+        socket
+        |> assign(:settings, settings)
+        |> assign(:form, to_form(settings, as: :settings))
+        |> assign(:saving, false)
+        |> put_flash(:info, "Settings saved successfully")
 
-        # Re-test connections
-        send(self(), :test_connections)
+      # Re-test connections
+      send(self(), :test_connections)
 
-        {:noreply, socket}
+      {:noreply, socket}
+    else
+      {:error, :invalid_url, field, reason} ->
+        {:noreply,
+         socket
+         |> assign(:saving, false)
+         |> assign(:form, to_form(params, as: :settings))
+         |> put_flash(:error, "Invalid #{humanize_field(field)}: #{reason}")}
 
       {:error, reason} ->
         error_msg =
@@ -110,6 +118,33 @@ defmodule ChatbotWeb.SettingsLive do
     status = test_lmstudio_connection()
     {:noreply, assign(socket, :lmstudio_status, status)}
   end
+
+  # Validate URL settings
+  defp validate_url_settings(params) do
+    alias Chatbot.URLValidator
+
+    url_fields = ["ollama_url", "lmstudio_url"]
+
+    Enum.reduce_while(url_fields, :ok, fn field, :ok ->
+      case Map.get(params, field) do
+        nil ->
+          {:cont, :ok}
+
+        "" ->
+          {:cont, :ok}
+
+        url ->
+          case URLValidator.validate_url(url) do
+            {:ok, _url} -> {:cont, :ok}
+            {:error, reason} -> {:halt, {:error, :invalid_url, field, reason}}
+          end
+      end
+    end)
+  end
+
+  defp humanize_field("ollama_url"), do: "Ollama URL"
+  defp humanize_field("lmstudio_url"), do: "LM Studio URL"
+  defp humanize_field(field), do: field
 
   @impl Phoenix.LiveView
   def render(assigns) do

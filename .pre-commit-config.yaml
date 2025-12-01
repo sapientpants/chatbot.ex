@@ -96,7 +96,15 @@ repos:
         pass_filenames: false
         files: ^(lib/|test/|config/|mix\.exs)
 
-      # 4. Static code analysis with Credo (medium speed)
+      # 4. Module size check (fast - prevents large modules)
+      - id: check-module-size
+        name: Check Elixir module size
+        entry: mix check_module_size
+        language: system
+        pass_filenames: false
+        files: ^lib/.*\.ex$
+
+      # 5. Static code analysis with Credo (medium speed)
       - id: credo
         name: Credo strict mode
         entry: mix credo --strict
@@ -104,7 +112,7 @@ repos:
         pass_filenames: false
         files: ^(lib/|test/).*\.ex$
 
-      # 5. Security-focused static analysis (medium speed)
+      # 6. Security-focused static analysis (medium speed)
       - id: sobelow
         name: Sobelow security analysis
         entry: mix sobelow --config
@@ -112,7 +120,7 @@ repos:
         pass_filenames: false
         files: ^(lib/|config/)
 
-      # 6. Test suite with coverage (slow - runs last)
+      # 7. Test suite with coverage (slow - runs last)
       - id: mix-test-coverage
         name: Mix test with 80% coverage
         entry: bash -c 'MIX_ENV=test mix coveralls'
@@ -120,7 +128,7 @@ repos:
         pass_filenames: false
         files: ^(lib/|test/).*\.ex[s]?$
 
-      # 7. Clean up unused dependencies (fast cleanup task)
+      # 8. Clean up unused dependencies (fast cleanup task)
       - id: mix-deps-unlock
         name: Unlock unused dependencies
         entry: mix deps.unlock --unused
