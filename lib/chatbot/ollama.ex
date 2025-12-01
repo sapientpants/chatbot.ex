@@ -14,16 +14,13 @@ defmodule Chatbot.Ollama do
         timeout_ms: 30_000,
         stream_timeout_ms: 300_000
 
-  ## Chat API
-
-  Ollama uses NDJSON (newline-delimited JSON) for streaming, not SSE:
-
-      {"message": {"content": "token"}, "done": false}
-      {"message": {"content": ""}, "done": true}
-
   """
 
   @behaviour Chatbot.OllamaBehaviour
+
+  alias Chatbot.CircuitBreaker
+  alias Chatbot.Ollama.ResponseFormatter
+  alias Chatbot.Ollama.Streaming
 
   require Logger
 
@@ -37,50 +34,34 @@ defmodule Chatbot.Ollama do
   @type model_info :: %{String.t() => any()}
 
   @fuse_name :ollama_fuse
-
-  # Circuit breaker configuration:
-  # - Max 5 failures within 60 seconds opens the circuit
-  # - Circuit attempts reset after 30 seconds
-  @fuse_max_failures 5
-  @fuse_window_ms 60_000
-  @fuse_reset_ms 30_000
-  @fuse_options {{:standard, @fuse_max_failures, @fuse_window_ms}, {:reset, @fuse_reset_ms}}
-
+  @fuse_opts [max_failures: 5, window_ms: 60_000, reset_ms: 30_000]
   @provider_prefix "ollama/"
 
+  # Configuration helpers
+
   defp base_url do
-    # Application config takes precedence (for tests), then Settings, then hardcoded default
-    config()[:base_url] ||
-      try do
-        Chatbot.Settings.get("ollama_url")
-      rescue
-        ArgumentError -> nil
-      end ||
-      "http://localhost:11434"
+    config()[:base_url] || settings_url() || "http://localhost:11434"
   end
 
   defp embedding_model do
-    # Application config takes precedence (for tests), then Settings, then hardcoded default
-    config()[:embedding_model] ||
-      try do
-        Chatbot.Settings.get("ollama_embedding_model")
-      rescue
-        ArgumentError -> nil
-      end ||
-      "qwen3-embedding:0.6b"
+    config()[:embedding_model] || settings_embedding_model() || "qwen3-embedding:0.6b"
   end
 
-  defp timeout do
-    config()[:timeout_ms] || 30_000
+  defp settings_url do
+    Chatbot.Settings.get("ollama_url")
+  rescue
+    ArgumentError -> nil
   end
 
-  defp stream_timeout do
-    config()[:stream_timeout_ms] || 300_000
+  defp settings_embedding_model do
+    Chatbot.Settings.get("ollama_embedding_model")
+  rescue
+    ArgumentError -> nil
   end
 
-  defp config do
-    Application.get_env(:chatbot, :ollama, [])
-  end
+  defp timeout, do: config()[:timeout_ms] || 30_000
+  defp stream_timeout, do: config()[:stream_timeout_ms] || 300_000
+  defp config, do: Application.get_env(:chatbot, :ollama, [])
 
   @doc """
   Strips the provider prefix from a model name.
@@ -102,156 +83,79 @@ defmodule Chatbot.Ollama do
     end
   end
 
-  defp ensure_fuse_installed do
-    case :fuse.ask(@fuse_name, :sync) do
-      :ok ->
-        :ok
-
-      :blown ->
-        :blown
-
-      {:error, :not_found} ->
-        :fuse.install(@fuse_name, @fuse_options)
-        :ok
-    end
-  end
-
-  defp with_circuit_breaker(fun) do
-    case ensure_fuse_installed() do
-      :blown ->
-        {:error, "Ollama service is temporarily unavailable. Please try again later."}
-
-      :ok ->
-        result = fun.()
-
-        case result do
-          {:error, _reason} ->
-            :fuse.melt(@fuse_name)
-            result
-
-          _success ->
-            result
-        end
-    end
-  end
-
   @doc """
   Returns the configured embedding dimension.
-
-  ## Examples
-
-      iex> embedding_dimension()
-      1024
-
   """
   @impl Chatbot.OllamaBehaviour
   @spec embedding_dimension() :: pos_integer()
-  def embedding_dimension do
-    config()[:embedding_dimension] || 1024
-  end
+  def embedding_dimension, do: config()[:embedding_dimension] || 1024
+
+  # ============================================================================
+  # Embedding Functions
+  # ============================================================================
 
   @doc """
   Generates an embedding vector for the given text.
   Protected by circuit breaker to prevent cascading failures.
-
-  ## Parameters
-    - text: The text to generate an embedding for
-
-  ## Returns
-    - `{:ok, embedding}` where embedding is a list of floats
-    - `{:error, reason}` on failure
-
-  ## Examples
-
-      iex> embed("Hello, world!")
-      {:ok, [0.123, -0.456, ...]}
-
-      iex> embed("test")
-      {:error, "Failed to connect to Ollama"}
-
   """
   @impl Chatbot.OllamaBehaviour
   @spec embed(String.t()) :: {:ok, [float()]} | {:error, String.t()}
   def embed(text) when is_binary(text) do
-    with_circuit_breaker(fn ->
-      body = %{
-        model: embedding_model(),
-        input: text
-      }
+    @fuse_name
+    |> CircuitBreaker.with_fuse(fn -> do_embed(text) end, @fuse_opts)
+    |> handle_circuit_error("Ollama")
+  end
 
-      case Req.post("#{base_url()}/api/embed",
-             json: body,
-             receive_timeout: timeout(),
-             retry: false
-           ) do
-        {:ok, %{status: 200, body: %{"embeddings" => [embedding | _rest]}}} ->
-          {:ok, embedding}
+  defp do_embed(text) do
+    body = %{model: embedding_model(), input: text}
 
-        {:ok, %{status: 200, body: %{"embeddings" => []}}} ->
-          Logger.warning("Ollama returned empty embeddings list")
-          {:error, "No embedding returned by Ollama for the given input."}
+    case Req.post("#{base_url()}/api/embed", json: body, receive_timeout: timeout(), retry: false) do
+      {:ok, %{status: 200, body: %{"embeddings" => [embedding | _rest]}}} ->
+        {:ok, embedding}
 
-        {:ok, %{status: 200, body: %{"embedding" => embedding}}} ->
-          # Fallback for older API format
-          {:ok, embedding}
+      {:ok, %{status: 200, body: %{"embeddings" => []}}} ->
+        Logger.warning("Ollama returned empty embeddings list")
+        {:error, "No embedding returned by Ollama for the given input."}
 
-        {:ok, %{status: status, body: body}} ->
-          Logger.warning("Ollama embed request failed: status=#{status}, body=#{inspect(body)}")
-          {:error, "Failed to generate embedding. Please check if Ollama is running."}
+      {:ok, %{status: 200, body: %{"embedding" => embedding}}} ->
+        {:ok, embedding}
 
-        {:error, exception} ->
-          Logger.warning("Ollama embed request error: #{Exception.message(exception)}")
-          {:error, "Failed to connect to Ollama. Please check if it is running."}
-      end
-    end)
+      {:ok, %{status: status, body: body}} ->
+        Logger.warning("Ollama embed request failed: status=#{status}, body=#{inspect(body)}")
+        {:error, "Failed to generate embedding. Please check if Ollama is running."}
+
+      {:error, exception} ->
+        Logger.warning("Ollama embed request error: #{Exception.message(exception)}")
+        {:error, "Failed to connect to Ollama. Please check if it is running."}
+    end
   end
 
   @doc """
   Generates embedding vectors for multiple texts in a single request.
-  Protected by circuit breaker to prevent cascading failures.
-
-  ## Parameters
-    - texts: List of texts to generate embeddings for
-
-  ## Returns
-    - `{:ok, embeddings}` where embeddings is a list of embedding vectors
-    - `{:error, reason}` on failure
-
-  ## Examples
-
-      iex> embed_batch(["Hello", "World"])
-      {:ok, [[0.123, ...], [0.456, ...]]}
-
   """
   @impl Chatbot.OllamaBehaviour
   @spec embed_batch([String.t()]) :: {:ok, [[float()]]} | {:error, String.t()}
   def embed_batch(texts) when is_list(texts) do
-    with_circuit_breaker(fn ->
-      body = %{
-        model: embedding_model(),
-        input: texts
-      }
+    @fuse_name
+    |> CircuitBreaker.with_fuse(fn -> do_embed_batch(texts) end, @fuse_opts)
+    |> handle_circuit_error("Ollama")
+  end
 
-      case Req.post("#{base_url()}/api/embed",
-             json: body,
-             receive_timeout: timeout(),
-             retry: false
-           ) do
-        {:ok, %{status: 200, body: %{"embeddings" => embeddings}}} when is_list(embeddings) ->
-          {:ok, embeddings}
+  defp do_embed_batch(texts) do
+    body = %{model: embedding_model(), input: texts}
 
-        {:ok, %{status: status, body: body}} ->
-          Logger.warning(
-            "Ollama batch embed request failed: status=#{status}, body=#{inspect(body)}"
-          )
+    case Req.post("#{base_url()}/api/embed", json: body, receive_timeout: timeout(), retry: false) do
+      {:ok, %{status: 200, body: %{"embeddings" => embeddings}}} when is_list(embeddings) ->
+        {:ok, embeddings}
 
-          {:error, "Failed to generate embeddings. Please check if Ollama is running."}
+      {:ok, %{status: status, body: body}} ->
+        Logger.warning("Ollama batch embed failed: status=#{status}, body=#{inspect(body)}")
+        {:error, "Failed to generate embeddings. Please check if Ollama is running."}
 
-        {:error, exception} ->
-          Logger.warning("Ollama batch embed request error: #{Exception.message(exception)}")
-          {:error, "Failed to connect to Ollama. Please check if it is running."}
-      end
-    end)
+      {:error, exception} ->
+        Logger.warning("Ollama batch embed error: #{Exception.message(exception)}")
+        {:error, "Failed to connect to Ollama. Please check if it is running."}
+    end
   end
 
   # ============================================================================
@@ -260,306 +164,106 @@ defmodule Chatbot.Ollama do
 
   @doc """
   Fetches the list of available models from Ollama.
-  Protected by circuit breaker to prevent cascading failures.
-
-  Models are returned with the `ollama/` prefix for provider identification.
-
-  ## Examples
-
-      iex> list_models()
-      {:ok, [%{"id" => "ollama/llama3", "name" => "llama3", ...}]}
-
-      iex> list_models()
-      {:error, "Failed to connect to Ollama"}
-
   """
   @impl Chatbot.OllamaBehaviour
   @spec list_models() :: {:ok, [model_info()]} | {:error, String.t()}
   def list_models do
-    with_circuit_breaker(fn ->
-      case Req.get("#{base_url()}/api/tags", receive_timeout: timeout(), retry: false) do
-        {:ok, %{status: 200, body: %{"models" => models}}} ->
-          prefixed_models =
-            Enum.map(models, fn model ->
-              name = model["name"] || model["model"]
+    @fuse_name
+    |> CircuitBreaker.with_fuse(fn -> do_list_models() end, @fuse_opts)
+    |> handle_circuit_error("Ollama")
+  end
 
-              %{
-                "id" => @provider_prefix <> name,
-                "name" => name,
-                "provider" => "ollama",
-                "size" => model["size"],
-                "modified_at" => model["modified_at"]
-              }
-            end)
+  defp do_list_models do
+    case Req.get("#{base_url()}/api/tags", receive_timeout: timeout(), retry: false) do
+      {:ok, %{status: 200, body: %{"models" => models}}} ->
+        {:ok, ResponseFormatter.format_model_list(models, @provider_prefix)}
 
-          {:ok, prefixed_models}
+      {:ok, %{status: status, body: body}} ->
+        Logger.warning("Ollama models request failed: status=#{status}, body=#{inspect(body)}")
+        {:error, "Failed to load models. Please check if Ollama is running."}
 
-        {:ok, %{status: status, body: body}} ->
-          Logger.warning("Ollama models request failed: status=#{status}, body=#{inspect(body)}")
-          {:error, "Failed to load models. Please check if Ollama is running."}
-
-        {:error, exception} ->
-          Logger.warning("Ollama models request error: #{Exception.message(exception)}")
-          {:error, "Failed to connect to Ollama. Please check if it is running."}
-      end
-    end)
+      {:error, exception} ->
+        Logger.warning("Ollama models request error: #{Exception.message(exception)}")
+        {:error, "Failed to connect to Ollama. Please check if it is running."}
+    end
   end
 
   @doc """
   Sends a non-streaming chat completion request.
-  Protected by circuit breaker to prevent cascading failures.
-
-  ## Parameters
-    - messages: List of messages in OpenAI format
-    - model: Model name to use (with or without `ollama/` prefix)
-
-  ## Returns
-    - `{:ok, response}` with the completion response in OpenAI-compatible format
-    - `{:error, reason}` on failure
-
-  ## Examples
-
-      iex> chat_completion([%{role: "user", content: "Hello"}], "ollama/llama3")
-      {:ok, %{"choices" => [%{"message" => %{"content" => "Hi there!"}}]}}
-
   """
   @impl Chatbot.OllamaBehaviour
   @spec chat_completion(messages(), String.t()) :: {:ok, map()} | {:error, String.t()}
   def chat_completion(messages, model) do
-    with_circuit_breaker(fn ->
-      # Strip provider prefix if present
-      model_name = strip_provider_prefix(model)
+    result =
+      CircuitBreaker.with_fuse(
+        @fuse_name,
+        fn -> do_chat_completion(messages, model) end,
+        @fuse_opts
+      )
 
-      body = %{
-        model: model_name,
-        messages: messages,
-        stream: false
-      }
+    handle_circuit_error(result, "Ollama")
+  end
 
-      case Req.post("#{base_url()}/api/chat",
-             json: body,
-             receive_timeout: timeout(),
-             retry: false
-           ) do
-        {:ok, %{status: 200, body: %{"message" => message} = response}} ->
-          # Convert Ollama response to OpenAI-compatible format
-          openai_response = %{
-            "choices" => [
-              %{
-                "index" => 0,
-                "message" => %{
-                  "role" => message["role"] || "assistant",
-                  "content" => message["content"] || ""
-                },
-                "finish_reason" => if(response["done"], do: "stop", else: nil)
-              }
-            ],
-            "model" => model_name,
-            "usage" => %{
-              "prompt_tokens" => response["prompt_eval_count"] || 0,
-              "completion_tokens" => response["eval_count"] || 0,
-              "total_tokens" =>
-                (response["prompt_eval_count"] || 0) + (response["eval_count"] || 0)
-            }
-          }
+  defp do_chat_completion(messages, model) do
+    model_name = strip_provider_prefix(model)
+    body = %{model: model_name, messages: messages, stream: false}
 
-          {:ok, openai_response}
+    case Req.post("#{base_url()}/api/chat", json: body, receive_timeout: timeout(), retry: false) do
+      {:ok, %{status: 200, body: %{"message" => message} = response}} ->
+        {:ok, ResponseFormatter.format_chat_response(message, response, model_name)}
 
-        {:ok, %{status: status, body: body}} ->
-          Logger.warning("Ollama chat completion failed: status=#{status}, body=#{inspect(body)}")
+      {:ok, %{status: status, body: body}} ->
+        Logger.warning("Ollama chat completion failed: status=#{status}, body=#{inspect(body)}")
+        {:error, "Failed to get AI response. Please try again."}
 
-          {:error, "Failed to get AI response. Please try again."}
-
-        {:error, exception} ->
-          Logger.warning("Ollama chat completion error: #{Exception.message(exception)}")
-          {:error, "Failed to connect to Ollama. Please check if it is running."}
-      end
-    end)
+      {:error, exception} ->
+        Logger.warning("Ollama chat completion error: #{Exception.message(exception)}")
+        {:error, "Failed to connect to Ollama. Please check if it is running."}
+    end
   end
 
   @doc """
   Sends a non-streaming chat completion request with tool definitions.
-
-  This enables tool/function calling with Ollama. Note that streaming is NOT
-  supported when tools are enabled - this is a limitation of the Ollama API.
-
-  ## Parameters
-    - messages: List of messages in OpenAI format [%{role: "user", content: "..."}]
-    - tools: List of tool definitions in OpenAI format
-    - model: Model name to use (with or without `ollama/` prefix)
-
-  ## Returns
-    - `{:ok, response}` with the completion, potentially including tool_calls
-    - `{:error, reason}` on failure
-
-  ## Tool Response Format
-  When the model decides to call tools, the response message will include:
-    - `tool_calls`: List of tool calls with id, name, and arguments
-
-  ## Examples
-
-      tools = [%{
-        "type" => "function",
-        "function" => %{
-          "name" => "get_weather",
-          "description" => "Get current weather",
-          "parameters" => %{"type" => "object", "properties" => %{}}
-        }
-      }]
-      {:ok, response} = chat_with_tools(messages, tools, "llama3.1")
-
   """
   @impl Chatbot.OllamaBehaviour
   @spec chat_with_tools(messages(), [map()], String.t()) :: {:ok, map()} | {:error, String.t()}
   def chat_with_tools(messages, tools, model) do
-    with_circuit_breaker(fn ->
-      # Strip provider prefix if present
-      model_name = strip_provider_prefix(model)
+    result =
+      CircuitBreaker.with_fuse(
+        @fuse_name,
+        fn -> do_chat_with_tools(messages, tools, model) end,
+        @fuse_opts
+      )
 
-      # Convert OpenAI-format tools to Ollama format if needed
-      ollama_tools = convert_tools_to_ollama_format(tools)
-
-      body = %{
-        model: model_name,
-        messages: messages,
-        tools: ollama_tools,
-        stream: false
-      }
-
-      case Req.post("#{base_url()}/api/chat",
-             json: body,
-             receive_timeout: timeout(),
-             retry: false
-           ) do
-        {:ok, %{status: 200, body: %{"message" => message} = response}} ->
-          # Build response with potential tool_calls
-          openai_response = build_tool_response(message, response, model_name)
-          {:ok, openai_response}
-
-        {:ok, %{status: status, body: body}} ->
-          Logger.warning("Ollama chat with tools failed: status=#{status}, body=#{inspect(body)}")
-
-          {:error, "Failed to get AI response. Please try again."}
-
-        {:error, exception} ->
-          Logger.warning("Ollama chat with tools error: #{Exception.message(exception)}")
-          {:error, "Failed to connect to Ollama. Please check if it is running."}
-      end
-    end)
+    handle_circuit_error(result, "Ollama")
   end
 
-  # Converts OpenAI-format tools to Ollama format.
-  # This is kept private as it's an internal implementation detail for API compatibility.
-  # Ollama uses the same tool format as OpenAI, but we normalize to ensure consistency.
-  defp convert_tools_to_ollama_format(tools) do
-    Enum.map(tools, fn tool ->
-      case tool do
-        %{"type" => "function", "function" => func} ->
-          %{
-            "type" => "function",
-            "function" => %{
-              "name" => func["name"],
-              "description" => func["description"] || "",
-              "parameters" => func["parameters"] || %{"type" => "object", "properties" => %{}}
-            }
-          }
+  defp do_chat_with_tools(messages, tools, model) do
+    model_name = strip_provider_prefix(model)
+    ollama_tools = ResponseFormatter.convert_tools_to_ollama(tools)
+    body = %{model: model_name, messages: messages, tools: ollama_tools, stream: false}
 
-        # Pass through tools that are already in the correct format or have unknown structure.
-        # Log at debug level to help identify unexpected formats during development.
-        other ->
-          Logger.debug("Tool passed through without conversion: #{inspect(other)}")
-          other
-      end
-    end)
-  end
+    case Req.post("#{base_url()}/api/chat", json: body, receive_timeout: timeout(), retry: false) do
+      {:ok, %{status: 200, body: %{"message" => message} = response}} ->
+        {:ok, ResponseFormatter.format_tool_response(message, response, model_name)}
 
-  # Build OpenAI-compatible response with tool_calls if present
-  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
-  defp build_tool_response(message, response, model_name) do
-    tool_calls = message["tool_calls"]
+      {:ok, %{status: status, body: body}} ->
+        Logger.warning("Ollama chat with tools failed: status=#{status}, body=#{inspect(body)}")
+        {:error, "Failed to get AI response. Please try again."}
 
-    message_content = %{
-      "role" => message["role"] || "assistant",
-      "content" => message["content"] || ""
-    }
-
-    # Add tool_calls to message if present
-    message_with_tools =
-      if tool_calls && length(tool_calls) > 0 do
-        formatted_calls =
-          Enum.map(tool_calls, fn call ->
-            %{
-              "id" => call["id"] || generate_tool_call_id(),
-              "type" => "function",
-              "function" => %{
-                "name" => get_in(call, ["function", "name"]) || call["name"],
-                "arguments" =>
-                  get_in(call, ["function", "arguments"]) ||
-                    Jason.encode!(call["arguments"] || %{})
-              }
-            }
-          end)
-
-        Map.put(message_content, "tool_calls", formatted_calls)
-      else
-        message_content
-      end
-
-    finish_reason =
-      cond do
-        tool_calls && length(tool_calls) > 0 -> "tool_calls"
-        response["done"] -> "stop"
-        true -> nil
-      end
-
-    %{
-      "choices" => [
-        %{
-          "index" => 0,
-          "message" => message_with_tools,
-          "finish_reason" => finish_reason
-        }
-      ],
-      "model" => model_name,
-      "usage" => %{
-        "prompt_tokens" => response["prompt_eval_count"] || 0,
-        "completion_tokens" => response["eval_count"] || 0,
-        "total_tokens" => (response["prompt_eval_count"] || 0) + (response["eval_count"] || 0)
-      }
-    }
-  end
-
-  defp generate_tool_call_id do
-    "call_" <> Base.encode16(:crypto.strong_rand_bytes(12), case: :lower)
+      {:error, exception} ->
+        Logger.warning("Ollama chat with tools error: #{Exception.message(exception)}")
+        {:error, "Failed to connect to Ollama. Please check if it is running."}
+    end
   end
 
   @doc """
   Sends a chat completion request with streaming enabled.
-  Protected by circuit breaker to prevent cascading failures.
-
-  Ollama uses NDJSON (newline-delimited JSON) for streaming responses.
-
-  ## Parameters
-    - messages: List of messages in OpenAI format [%{role: "user", content: "..."}]
-    - model: Model name to use (with or without `ollama/` prefix)
-    - pid: Process ID to send streaming chunks to
-
-  ## Messages sent to pid
-    - `{:chunk, content}` - A token chunk
-    - `{:done, ""}` - Streaming complete
-    - `{:error, reason}` - An error occurred
-
-  ## Examples
-
-      iex> stream_chat_completion([%{role: "user", content: "Hello"}], "ollama/llama3", self())
-      :ok
-
   """
   @impl Chatbot.OllamaBehaviour
   @spec stream_chat_completion(messages(), String.t(), pid()) :: :ok | {:error, String.t()}
   def stream_chat_completion(messages, model, pid) do
-    # Check circuit breaker first
-    case ensure_fuse_installed() do
+    case CircuitBreaker.ensure_installed(@fuse_name, @fuse_opts) do
       :blown ->
         error_msg = "Ollama service is temporarily unavailable. Please try again later."
         send(pid, {:error, error_msg})
@@ -571,51 +275,9 @@ defmodule Chatbot.Ollama do
   end
 
   defp do_stream_chat_completion(messages, model, pid) do
-    # Strip provider prefix if present
     model_name = strip_provider_prefix(model)
-
-    body = %{
-      model: model_name,
-      messages: messages,
-      stream: true
-    }
-
-    # Custom Finch streaming function to handle NDJSON
-    finch_stream = fn request, finch_request, finch_name, finch_options ->
-      # Buffer for incomplete JSON lines
-      buffer = ""
-
-      stream_handler = fn
-        {:status, status}, {response, buf} ->
-          {%{response | status: status}, buf}
-
-        {:headers, headers}, {response, buf} ->
-          {%{response | headers: headers}, buf}
-
-        {:data, data}, {response, buf} ->
-          # Combine buffer with new data and process complete lines
-          combined = buf <> data
-          {remaining, _ok} = process_ndjson_data(combined, pid)
-          {response, remaining}
-      end
-
-      case Finch.stream(
-             finch_request,
-             finch_name,
-             {Req.Response.new(), buffer},
-             stream_handler,
-             finch_options
-           ) do
-        {:ok, {response, _remaining_buffer}} ->
-          send(pid, {:done, ""})
-          {request, response}
-
-        {:error, exception, _accumulator} ->
-          Logger.warning("Finch stream error: #{inspect(exception)}")
-          send(pid, {:error, "Failed to get AI response. Please try again."})
-          raise "Finch streaming failed: #{inspect(exception)}"
-      end
-    end
+    body = %{model: model_name, messages: messages, stream: true}
+    finch_stream = Streaming.create_stream_handler(pid)
 
     try do
       Req.post!("#{base_url()}/api/chat",
@@ -628,8 +290,7 @@ defmodule Chatbot.Ollama do
       :ok
     rescue
       e ->
-        # Record failure in circuit breaker
-        :fuse.melt(@fuse_name)
+        CircuitBreaker.melt(@fuse_name)
         Logger.warning("Ollama streaming error: #{Exception.message(e)}")
         error_msg = "Failed to get AI response. Please try again."
         send(pid, {:error, error_msg})
@@ -637,40 +298,10 @@ defmodule Chatbot.Ollama do
     end
   end
 
-  # Process NDJSON data, handling incomplete lines
-  defp process_ndjson_data(data, pid) do
-    lines = String.split(data, "\n")
-
-    # The last element might be incomplete if we're mid-stream
-    {complete_lines, remaining} =
-      case List.last(lines) do
-        "" -> {Enum.drop(lines, -1), ""}
-        incomplete -> {Enum.drop(lines, -1), incomplete}
-      end
-
-    Enum.each(complete_lines, fn line ->
-      process_ndjson_line(String.trim(line), pid)
-    end)
-
-    {remaining, :ok}
+  # Converts circuit breaker errors to user-friendly messages
+  defp handle_circuit_error({:error, :circuit_open}, provider) do
+    {:error, "#{provider} service is temporarily unavailable. Please try again later."}
   end
 
-  defp process_ndjson_line("", _pid), do: :ok
-
-  defp process_ndjson_line(json_string, pid) do
-    case Jason.decode(json_string) do
-      {:ok, %{"message" => %{"content" => content}, "done" => false}} when content != "" ->
-        send(pid, {:chunk, content})
-
-      {:ok, %{"done" => true}} ->
-        :ok
-
-      {:ok, _other} ->
-        :ok
-
-      {:error, _reason} ->
-        Logger.debug("Failed to parse Ollama NDJSON line: #{json_string}")
-        :ok
-    end
-  end
+  defp handle_circuit_error(result, _provider), do: result
 end

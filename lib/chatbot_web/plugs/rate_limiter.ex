@@ -6,6 +6,7 @@ defmodule ChatbotWeb.Plugs.RateLimiter do
   """
   import Plug.Conn
   import Phoenix.Controller
+  import Bitwise
 
   @type rate_limit_result :: :ok | {:error, String.t()}
 
@@ -131,23 +132,81 @@ defmodule ChatbotWeb.Plugs.RateLimiter do
 
   @doc """
   Extracts the client IP address from the connection.
-  Handles X-Forwarded-For headers for requests behind proxies/load balancers.
+
+  Security considerations:
+  - X-Forwarded-For headers can be spoofed by clients
+  - Only trust forwarded headers if behind a known proxy (configured via :trusted_proxies)
+  - Validates IP format to prevent injection attacks
+  - Falls back to remote_ip if header is untrusted or invalid
   """
   @spec get_ip(Plug.Conn.t()) :: String.t()
   def get_ip(conn) do
-    case Plug.Conn.get_req_header(conn, "x-forwarded-for") do
-      [forwarded | _rest] ->
-        # X-Forwarded-For can contain multiple IPs: "client, proxy1, proxy2"
-        # The first IP is the original client
-        forwarded
-        |> String.split(",")
-        |> List.first()
-        |> String.trim()
+    remote_ip = format_ip(conn.remote_ip)
 
-      [] ->
-        conn.remote_ip
-        |> Tuple.to_list()
-        |> Enum.join(".")
+    # Only trust X-Forwarded-For if request comes from a trusted proxy
+    if trusted_proxy?(conn.remote_ip) do
+      case Plug.Conn.get_req_header(conn, "x-forwarded-for") do
+        [forwarded | _rest] ->
+          first_valid_ip =
+            forwarded
+            |> String.split(",")
+            |> Enum.map(&String.trim/1)
+            |> Enum.find(&valid_ip?/1)
+
+          first_valid_ip || remote_ip
+
+        [] ->
+          remote_ip
+      end
+    else
+      remote_ip
     end
   end
+
+  # Formats an IP tuple to a string
+  defp format_ip({a, b, c, d}), do: "#{a}.#{b}.#{c}.#{d}"
+  defp format_ip({a, b, c, d, e, f, g, h}), do: "#{a}:#{b}:#{c}:#{d}:#{e}:#{f}:#{g}:#{h}"
+  defp format_ip(_other), do: "unknown"
+
+  # Validates IP address format (IPv4 or IPv6)
+  defp valid_ip?(ip) when is_binary(ip) do
+    case :inet.parse_address(String.to_charlist(ip)) do
+      {:ok, _addr} -> true
+      {:error, _reason} -> false
+    end
+  end
+
+  defp valid_ip?(_other), do: false
+
+  # Checks if the remote IP is in the trusted proxy list
+  defp trusted_proxy?(remote_ip) do
+    trusted_proxies = get_trusted_proxies()
+
+    Enum.any?(trusted_proxies, fn proxy ->
+      ip_in_range?(remote_ip, proxy)
+    end)
+  end
+
+  # Gets configured trusted proxy networks
+  defp get_trusted_proxies do
+    Application.get_env(:chatbot, :rate_limits, [])[:trusted_proxies] ||
+      [
+        # Loopback (localhost)
+        {{127, 0, 0, 0}, 8},
+        # Private networks (common for reverse proxies)
+        {{10, 0, 0, 0}, 8},
+        {{172, 16, 0, 0}, 12},
+        {{192, 168, 0, 0}, 16}
+      ]
+  end
+
+  # Checks if an IP is within a CIDR range
+  defp ip_in_range?({a, b, c, d}, {{na, nb, nc, nd}, prefix}) do
+    ip_int = a <<< 24 ||| b <<< 16 ||| c <<< 8 ||| d
+    network_int = na <<< 24 ||| nb <<< 16 ||| nc <<< 8 ||| nd
+    mask = 0xFFFFFFFF <<< (32 - prefix) &&& 0xFFFFFFFF
+    (ip_int &&& mask) == (network_int &&& mask)
+  end
+
+  defp ip_in_range?(_ip, _network), do: false
 end
