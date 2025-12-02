@@ -11,9 +11,14 @@ defmodule ChatbotWeb.Plugs.RateLimiter do
 
       config :chatbot, :rate_limits,
         trusted_proxies: [
-          {{127, 0, 0, 1}, 32},  # Exact localhost
-          {{10, 0, 1, 5}, 32}    # Specific proxy IP
+          {{127, 0, 0, 1}, 32},    # Exact match: 127.0.0.1/32
+          {{10, 0, 1, 0}, 24},     # Subnet: 10.0.1.0/24 (10.0.1.0 - 10.0.1.255)
+          {{192, 168, 0, 0}, 16}   # Network: 192.168.0.0/16
         ]
+
+  Each entry is a tuple of `{ip_address_tuple, prefix_length}` in CIDR notation.
+  For example, `{{127, 0, 0, 1}, 32}` matches only `127.0.0.1`, while
+  `{{10, 0, 1, 0}, 24}` matches the entire `10.0.1.0/24` subnet.
 
   By default, no proxies are trusted and X-Forwarded-For headers are ignored.
   This prevents IP spoofing attacks from internal networks.
