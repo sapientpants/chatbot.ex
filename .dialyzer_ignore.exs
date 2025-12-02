@@ -42,5 +42,9 @@
 
   # TaskRegistry max_concurrent_tasks/0 returns a compile-time constant
   # The @spec is intentionally broader for future configurability
-  {"lib/chatbot_web/live/chat/task_registry.ex", :contract_supertype}
+  {"lib/chatbot_web/live/chat/task_registry.ex", :contract_supertype},
+
+  # ConversationAttachment returns compile-time constants for max_file_size and max_attachments
+  # The @spec is intentionally broader (pos_integer) for future configurability
+  {"lib/chatbot/chat/conversation_attachment.ex", :contract_supertype}
 ]
