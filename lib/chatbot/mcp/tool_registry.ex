@@ -89,10 +89,10 @@ defmodule Chatbot.MCP.ToolRegistry do
   end
 
   @doc """
-  Resolves which server provides a tool and returns the client.
+  Resolves which server provides a tool and returns the client, server, and tool schema.
   """
   @spec resolve_tool(String.t(), binary()) ::
-          {:ok, pid(), Server.t()} | {:error, :tool_not_found | term()}
+          {:ok, pid(), Server.t(), map()} | {:error, :tool_not_found | term()}
   def resolve_tool(tool_name, user_id) do
     case get_tool_mapping(user_id) do
       {:ok, mapping} ->
@@ -100,11 +100,12 @@ defmodule Chatbot.MCP.ToolRegistry do
           nil ->
             {:error, :tool_not_found}
 
-          %{server_id: server_id} ->
+          %{server_id: server_id, tool: tool} ->
             server = MCP.get_server!(server_id)
+            schema = Map.get(tool, "inputSchema", %{"type" => "object"})
 
             case ClientRegistry.get_client(server) do
-              {:ok, client} -> {:ok, client, server}
+              {:ok, client} -> {:ok, client, server, schema}
               error -> error
             end
         end

@@ -8,8 +8,10 @@ defmodule Chatbot.MCP.ToolExecutor do
   - Reports telemetry for observability
   """
 
+  alias Chatbot.MCP.ArgumentSanitizer
   alias Chatbot.MCP.ClientRegistry
   alias Chatbot.MCP.ToolRegistry
+  alias Chatbot.SecurityLog
 
   require Logger
 
@@ -42,8 +44,14 @@ defmodule Chatbot.MCP.ToolExecutor do
 
     result =
       case ToolRegistry.resolve_tool(name, user_id) do
-        {:ok, _client, server} ->
-          execute_with_timeout(name, args, server, timeout)
+        {:ok, _client, server, schema} ->
+          case ArgumentSanitizer.sanitize(args, schema) do
+            {:ok, sanitized_args} ->
+              execute_with_timeout(name, sanitized_args, server, timeout)
+
+            {:error, reason} ->
+              {:error, "Invalid arguments: #{reason}"}
+          end
 
         {:error, :tool_not_found} ->
           {:error, "Tool '#{name}' not found or not enabled"}
@@ -56,6 +64,9 @@ defmodule Chatbot.MCP.ToolExecutor do
       end
 
     duration_ms = System.monotonic_time(:millisecond) - start_time
+
+    # Log tool execution for security auditing
+    log_tool_execution(user_id, name, result, duration_ms)
 
     build_result(id, name, result, duration_ms)
   end
@@ -218,5 +229,13 @@ defmodule Chatbot.MCP.ToolExecutor do
 
   defp config(key) do
     Application.get_env(:chatbot, :mcp, [])[key]
+  end
+
+  defp log_tool_execution(user_id, tool_name, {:ok, _result}, duration_ms) do
+    SecurityLog.mcp_tool_executed(user_id, tool_name, %{duration_ms: duration_ms})
+  end
+
+  defp log_tool_execution(user_id, tool_name, {:error, error}, duration_ms) do
+    SecurityLog.mcp_tool_failed(user_id, tool_name, error, %{duration_ms: duration_ms})
   end
 end

@@ -70,76 +70,92 @@ defmodule ChatbotWeb.Live.Chat.MessageProcessor do
   defp start_streaming(socket, user_message, openai_messages, model, user_id) do
     liveview_pid = self()
 
-    case Task.Supervisor.start_child(Chatbot.TaskSupervisor, fn ->
-           ProviderRouter.stream_chat_completion(openai_messages, model, liveview_pid)
-         end) do
-      {:ok, task_pid} ->
-        TaskRegistry.register_task(user_id, task_pid)
-        Process.monitor(task_pid)
-
-        {:noreply,
-         socket
-         |> stream_insert(:messages, user_message, at: -1)
-         |> assign(:has_messages, true)
-         |> assign(:streaming_chunks, [])
-         |> assign(:streaming_task_pid, task_pid)
-         |> assign(:is_streaming, true)
-         |> assign(:last_user_message, user_message.content)
-         |> assign(:form, to_form(%{"content" => ""}, as: :message))}
-
-      {:error, reason} ->
-        Logger.error("Failed to start streaming task: #{inspect(reason)}")
-
-        {:noreply,
-         socket
-         |> stream_insert(:messages, user_message, at: -1)
-         |> put_flash(:error, "Failed to start AI response. Please try again.")
-         |> assign(:form, to_form(%{"content" => ""}, as: :message))}
+    task_fn = fn ->
+      ProviderRouter.stream_chat_completion(openai_messages, model, liveview_pid)
     end
+
+    socket_updater = fn socket, task_pid ->
+      socket
+      |> stream_insert(:messages, user_message, at: -1)
+      |> assign(:has_messages, true)
+      |> assign(:streaming_chunks, [])
+      |> assign(:streaming_task_pid, task_pid)
+      |> assign(:is_streaming, true)
+      |> assign(:last_user_message, user_message.content)
+      |> assign(:form, to_form(%{"content" => ""}, as: :message))
+    end
+
+    start_supervised_task(socket, user_message, user_id, liveview_pid, task_fn, socket_updater)
   end
 
   defp start_agent_loop(socket, user_message, openai_messages, model, user_id) do
     liveview_pid = self()
-
     on_tool_call = fn tool_call -> send(liveview_pid, {:tool_call_start, tool_call}) end
     on_tool_result = fn result -> send(liveview_pid, {:tool_call_complete, result}) end
 
-    case Task.Supervisor.start_child(Chatbot.TaskSupervisor, fn ->
-           result =
-             AgentLoop.run(openai_messages,
-               user_id: user_id,
-               model: model,
-               on_tool_call: on_tool_call,
-               on_tool_result: on_tool_result
-             )
+    task_fn = fn ->
+      result =
+        AgentLoop.run(openai_messages,
+          user_id: user_id,
+          model: model,
+          on_tool_call: on_tool_call,
+          on_tool_result: on_tool_result
+        )
 
-           send(liveview_pid, {:agent_complete, result})
-         end) do
-      {:ok, task_pid} ->
-        TaskRegistry.register_task(user_id, task_pid)
-        Process.monitor(task_pid)
-
-        {:noreply,
-         socket
-         |> stream_insert(:messages, user_message, at: -1)
-         |> assign(:has_messages, true)
-         |> assign(:streaming_task_pid, task_pid)
-         |> assign(:is_streaming, true)
-         |> assign(:agent_mode, true)
-         |> assign(:pending_tool_calls, [])
-         |> assign(:tool_results, [])
-         |> assign(:last_user_message, user_message.content)
-         |> assign(:form, to_form(%{"content" => ""}, as: :message))}
-
-      {:error, reason} ->
-        Logger.error("Failed to start agent loop task: #{inspect(reason)}")
-
-        {:noreply,
-         socket
-         |> stream_insert(:messages, user_message, at: -1)
-         |> put_flash(:error, "Failed to start AI response. Please try again.")
-         |> assign(:form, to_form(%{"content" => ""}, as: :message))}
+      send(liveview_pid, {:agent_complete, result})
     end
+
+    socket_updater = fn socket, task_pid ->
+      socket
+      |> stream_insert(:messages, user_message, at: -1)
+      |> assign(:has_messages, true)
+      |> assign(:streaming_task_pid, task_pid)
+      |> assign(:is_streaming, true)
+      |> assign(:agent_mode, true)
+      |> assign(:pending_tool_calls, [])
+      |> assign(:tool_results, [])
+      |> assign(:last_user_message, user_message.content)
+      |> assign(:form, to_form(%{"content" => ""}, as: :message))
+    end
+
+    start_supervised_task(socket, user_message, user_id, liveview_pid, task_fn, socket_updater)
+  end
+
+  # Common helper for starting supervised tasks with proper registration
+  defp start_supervised_task(socket, user_message, user_id, liveview_pid, task_fn, socket_updater) do
+    case TaskRegistry.try_register_task(user_id, liveview_pid) do
+      :ok ->
+        case Task.Supervisor.start_child(Chatbot.TaskSupervisor, task_fn) do
+          {:ok, task_pid} ->
+            finalize_task_registration(user_id, liveview_pid, task_pid)
+            {:noreply, socket_updater.(socket, task_pid)}
+
+          {:error, reason} ->
+            TaskRegistry.unregister_task(user_id, liveview_pid)
+            Logger.error("Failed to start task: #{inspect(reason)}")
+
+            {:noreply,
+             socket
+             |> stream_insert(:messages, user_message, at: -1)
+             |> put_flash(:error, "Failed to start AI response. Please try again.")
+             |> assign(:form, to_form(%{"content" => ""}, as: :message))}
+        end
+
+      {:error, :limit_exceeded} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "Too many active requests. Please wait for current responses to complete."
+         )}
+    end
+  end
+
+  # Swaps the liveview placeholder PID with the real task PID and monitors it
+  defp finalize_task_registration(user_id, liveview_pid, task_pid) do
+    TaskRegistry.unregister_task(user_id, liveview_pid)
+    TaskRegistry.register_task(user_id, task_pid)
+    Process.monitor(task_pid)
   end
 
   defp reset_streaming_state(socket) do
