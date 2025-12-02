@@ -28,5 +28,19 @@
   {"lib/chatbot/mcp/tool_registry.ex", :pattern_match},
   {"lib/chatbot/mcp/tool_registry.ex", :pattern_match_cov},
   {"lib/chatbot/mcp/tool_registry.ex", :extra_range},
-  {"lib/chatbot/mcp/tool_registry.ex", :unused_fun}
+  {"lib/chatbot/mcp/tool_registry.ex", :unused_fun},
+
+  # ArgumentSanitizer handles external input where types are not guaranteed
+  # Dialyzer's type narrowing causes false positives for defensive type checking
+  {"lib/chatbot/mcp/argument_sanitizer.ex", :guard_fail},
+  {"lib/chatbot/mcp/argument_sanitizer.ex", :pattern_match},
+  {"lib/chatbot/mcp/argument_sanitizer.ex", :pattern_match_cov},
+
+  # SecurityLog log/3 function handles :info/:warning/:error levels
+  # Dialyzer narrows the type based on actual usage but all branches are valid
+  {"lib/chatbot/security_log.ex", :pattern_match},
+
+  # TaskRegistry max_concurrent_tasks/0 returns a compile-time constant
+  # The @spec is intentionally broader for future configurability
+  {"lib/chatbot_web/live/chat/task_registry.ex", :contract_supertype}
 ]
