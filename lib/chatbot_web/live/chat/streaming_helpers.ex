@@ -115,18 +115,13 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
     else
       user_id = socket.assigns.current_user.id
 
-      if can_start_task?(user_id) do
-        case RateLimiter.check_message_rate_limit(user_id) do
-          :ok -> MessageProcessor.process(content, socket)
-          {:error, message} -> {:noreply, put_flash(socket, :error, message)}
-        end
-      else
-        {:noreply,
-         put_flash(
-           socket,
-           :error,
-           "Too many active requests. Please wait for current responses to complete."
-         )}
+      case RateLimiter.check_message_rate_limit(user_id) do
+        :ok ->
+          # MessageProcessor handles atomic task registration
+          MessageProcessor.process(content, socket)
+
+        {:error, message} ->
+          {:noreply, put_flash(socket, :error, message)}
       end
     end
   end

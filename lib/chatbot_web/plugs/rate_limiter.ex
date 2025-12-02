@@ -8,6 +8,8 @@ defmodule ChatbotWeb.Plugs.RateLimiter do
   import Phoenix.Controller
   import Bitwise
 
+  alias Chatbot.SecurityLog
+
   @type rate_limit_result :: :ok | {:error, String.t()}
 
   @doc """
@@ -30,19 +32,12 @@ defmodule ChatbotWeb.Plugs.RateLimiter do
   """
   @spec rate_limit_login(Plug.Conn.t(), keyword()) :: Plug.Conn.t()
   def rate_limit_login(conn, _opts) do
-    key = "login:#{get_ip(conn)}"
-    config = get_rate_limit_config(:login)
-
-    case Hammer.check_rate(key, config[:window_ms], config[:max_attempts]) do
-      {:allow, _count} ->
-        conn
-
-      {:deny, _limit} ->
-        conn
-        |> put_flash(:error, "Too many login attempts. Please try again in a minute.")
-        |> redirect(to: "/login")
-        |> halt()
-    end
+    check_rate_and_redirect(
+      conn,
+      :login,
+      "Too many login attempts. Please try again in a minute.",
+      "/login"
+    )
   end
 
   @doc """
@@ -51,17 +46,30 @@ defmodule ChatbotWeb.Plugs.RateLimiter do
   """
   @spec rate_limit_registration(Plug.Conn.t(), keyword()) :: Plug.Conn.t()
   def rate_limit_registration(conn, _opts) do
-    key = "registration:#{get_ip(conn)}"
-    config = get_rate_limit_config(:registration)
+    check_rate_and_redirect(
+      conn,
+      :registration,
+      "Too many registration attempts. Please try again later.",
+      "/register"
+    )
+  end
+
+  # Common helper for rate limiting with redirect
+  defp check_rate_and_redirect(conn, limit_type, error_message, redirect_path) do
+    ip = get_ip(conn)
+    key = "#{limit_type}:#{ip}"
+    config = get_rate_limit_config(limit_type)
 
     case Hammer.check_rate(key, config[:window_ms], config[:max_attempts]) do
       {:allow, _count} ->
         conn
 
       {:deny, _limit} ->
+        SecurityLog.rate_limit_exceeded(ip, limit_type, %{ip: ip})
+
         conn
-        |> put_flash(:error, "Too many registration attempts. Please try again later.")
-        |> redirect(to: "/register")
+        |> put_flash(:error, error_message)
+        |> redirect(to: redirect_path)
         |> halt()
     end
   end
@@ -84,7 +92,9 @@ defmodule ChatbotWeb.Plugs.RateLimiter do
            Hammer.check_rate(burst_key, burst_config[:window_ms], burst_config[:max_attempts]) do
       :ok
     else
-      {:deny, _limit} -> {:error, "Rate limit exceeded. Please slow down."}
+      {:deny, _limit} ->
+        SecurityLog.rate_limit_exceeded(to_string(user_id), :message, %{user_id: user_id})
+        {:error, "Rate limit exceeded. Please slow down."}
     end
   end
 
@@ -99,8 +109,12 @@ defmodule ChatbotWeb.Plugs.RateLimiter do
     config = get_rate_limit_config(:registration)
 
     case Hammer.check_rate(key, config[:window_ms], config[:max_attempts]) do
-      {:allow, _count} -> :ok
-      {:deny, _limit} -> {:error, "Too many registration attempts. Please try again later."}
+      {:allow, _count} ->
+        :ok
+
+      {:deny, _limit} ->
+        SecurityLog.rate_limit_exceeded(ip, :registration, %{ip: ip})
+        {:error, "Too many registration attempts. Please try again later."}
     end
   end
 
@@ -115,8 +129,12 @@ defmodule ChatbotWeb.Plugs.RateLimiter do
     config = get_rate_limit_config(:password_reset)
 
     case Hammer.check_rate(key, config[:window_ms], config[:max_attempts]) do
-      {:allow, _count} -> :ok
-      {:deny, _limit} -> {:error, "Too many password reset requests. Please try again later."}
+      {:allow, _count} ->
+        :ok
+
+      {:deny, _limit} ->
+        SecurityLog.rate_limit_exceeded(email, :password_reset, %{})
+        {:error, "Too many password reset requests. Please try again later."}
     end
   end
 
