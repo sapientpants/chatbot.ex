@@ -3,6 +3,20 @@ defmodule ChatbotWeb.Plugs.RateLimiter do
   Rate limiting plugs to prevent abuse and protect application resources.
 
   Configuration is loaded from application config under `:chatbot, :rate_limits`.
+
+  ## Trusted Proxies
+
+  For deployments behind a reverse proxy (nginx, load balancer), you must explicitly
+  configure trusted proxy IPs to safely use X-Forwarded-For headers:
+
+      config :chatbot, :rate_limits,
+        trusted_proxies: [
+          {{127, 0, 0, 1}, 32},  # Exact localhost
+          {{10, 0, 1, 5}, 32}    # Specific proxy IP
+        ]
+
+  By default, no proxies are trusted and X-Forwarded-For headers are ignored.
+  This prevents IP spoofing attacks from internal networks.
   """
   import Plug.Conn
   import Phoenix.Controller
@@ -206,16 +220,9 @@ defmodule ChatbotWeb.Plugs.RateLimiter do
   end
 
   # Gets configured trusted proxy networks
+  # Defaults to empty list for security - must be explicitly configured
   defp get_trusted_proxies do
-    Application.get_env(:chatbot, :rate_limits, [])[:trusted_proxies] ||
-      [
-        # Loopback (localhost)
-        {{127, 0, 0, 0}, 8},
-        # Private networks (common for reverse proxies)
-        {{10, 0, 0, 0}, 8},
-        {{172, 16, 0, 0}, 12},
-        {{192, 168, 0, 0}, 16}
-      ]
+    Application.get_env(:chatbot, :rate_limits, [])[:trusted_proxies] || []
   end
 
   # Checks if an IP is within a CIDR range

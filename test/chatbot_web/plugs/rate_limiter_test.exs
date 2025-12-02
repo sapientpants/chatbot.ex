@@ -220,22 +220,45 @@ defmodule ChatbotWeb.Plugs.RateLimiterTest do
       assert RateLimiter.get_ip(conn) == "8.8.8.8"
     end
 
-    test "trusts X-Forwarded-For from trusted proxy (loopback)" do
+    test "ignores X-Forwarded-For by default (no trusted proxies configured)" do
+      # By default, no proxies are trusted - prevents IP spoofing
+      conn = %Plug.Conn{
+        remote_ip: {127, 0, 0, 1},
+        req_headers: [{"x-forwarded-for", "203.0.113.50"}]
+      }
+
+      # Should use remote_ip, not the header
+      assert RateLimiter.get_ip(conn) == "127.0.0.1"
+    end
+
+    test "trusts X-Forwarded-For when proxy is explicitly configured" do
+      # Configure loopback as trusted proxy
+      Application.put_env(:chatbot, :rate_limits, trusted_proxies: [{{127, 0, 0, 0}, 8}])
+
       conn = %Plug.Conn{
         remote_ip: {127, 0, 0, 1},
         req_headers: [{"x-forwarded-for", "203.0.113.50"}]
       }
 
       assert RateLimiter.get_ip(conn) == "203.0.113.50"
+
+      # Cleanup
+      Application.delete_env(:chatbot, :rate_limits)
     end
 
-    test "trusts X-Forwarded-For from trusted proxy (private network)" do
+    test "trusts X-Forwarded-For from configured private network proxy" do
+      # Configure 10.x.x.x as trusted proxy
+      Application.put_env(:chatbot, :rate_limits, trusted_proxies: [{{10, 0, 0, 0}, 8}])
+
       conn = %Plug.Conn{
         remote_ip: {10, 0, 0, 1},
         req_headers: [{"x-forwarded-for", "198.51.100.25"}]
       }
 
       assert RateLimiter.get_ip(conn) == "198.51.100.25"
+
+      # Cleanup
+      Application.delete_env(:chatbot, :rate_limits)
     end
 
     test "ignores X-Forwarded-For from untrusted public IP" do
@@ -249,7 +272,10 @@ defmodule ChatbotWeb.Plugs.RateLimiterTest do
       assert RateLimiter.get_ip(conn) == "203.0.113.1"
     end
 
-    test "handles multiple IPs in X-Forwarded-For from trusted proxy" do
+    test "handles multiple IPs in X-Forwarded-For from configured trusted proxy" do
+      # Configure 192.168.x.x as trusted proxy
+      Application.put_env(:chatbot, :rate_limits, trusted_proxies: [{{192, 168, 0, 0}, 16}])
+
       conn = %Plug.Conn{
         remote_ip: {192, 168, 1, 1},
         req_headers: [{"x-forwarded-for", "203.0.113.50, 10.0.0.1, 192.168.1.1"}]
@@ -257,9 +283,15 @@ defmodule ChatbotWeb.Plugs.RateLimiterTest do
 
       # Should use the first valid IP (the original client)
       assert RateLimiter.get_ip(conn) == "203.0.113.50"
+
+      # Cleanup
+      Application.delete_env(:chatbot, :rate_limits)
     end
 
     test "rejects invalid IP in X-Forwarded-For header" do
+      # Configure loopback as trusted proxy
+      Application.put_env(:chatbot, :rate_limits, trusted_proxies: [{{127, 0, 0, 0}, 8}])
+
       conn = %Plug.Conn{
         remote_ip: {127, 0, 0, 1},
         req_headers: [{"x-forwarded-for", "invalid-ip, not-an-ip"}]
@@ -267,9 +299,15 @@ defmodule ChatbotWeb.Plugs.RateLimiterTest do
 
       # Should fall back to remote_ip since no valid IP in header
       assert RateLimiter.get_ip(conn) == "127.0.0.1"
+
+      # Cleanup
+      Application.delete_env(:chatbot, :rate_limits)
     end
 
     test "finds first valid IP when header contains mix of valid and invalid" do
+      # Configure loopback as trusted proxy
+      Application.put_env(:chatbot, :rate_limits, trusted_proxies: [{{127, 0, 0, 0}, 8}])
+
       conn = %Plug.Conn{
         remote_ip: {127, 0, 0, 1},
         req_headers: [{"x-forwarded-for", "invalid, 203.0.113.50, 10.0.0.1"}]
@@ -277,6 +315,9 @@ defmodule ChatbotWeb.Plugs.RateLimiterTest do
 
       # Should skip invalid and use first valid IP
       assert RateLimiter.get_ip(conn) == "203.0.113.50"
+
+      # Cleanup
+      Application.delete_env(:chatbot, :rate_limits)
     end
 
     test "handles IPv6 remote_ip" do
@@ -286,6 +327,17 @@ defmodule ChatbotWeb.Plugs.RateLimiterTest do
       }
 
       assert RateLimiter.get_ip(conn) == "0:0:0:0:0:0:0:1"
+    end
+
+    test "ignores X-Forwarded-For from private IP when not configured as trusted" do
+      # Even private IPs should not be trusted by default
+      conn = %Plug.Conn{
+        remote_ip: {10, 0, 0, 1},
+        req_headers: [{"x-forwarded-for", "1.2.3.4"}]
+      }
+
+      # Should use remote_ip, not the header
+      assert RateLimiter.get_ip(conn) == "10.0.0.1"
     end
   end
 end
