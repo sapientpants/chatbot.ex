@@ -7,6 +7,7 @@ defmodule Chatbot.Chat do
   alias Chatbot.Repo
 
   alias Chatbot.Chat.Conversation
+  alias Chatbot.Chat.ConversationAttachment
   alias Chatbot.Chat.Message
 
   @doc """
@@ -276,5 +277,157 @@ defmodule Chatbot.Chat do
     Enum.map(messages, fn msg ->
       %{role: msg.role, content: msg.content}
     end)
+  end
+
+  # ============================================
+  # Attachment Functions
+  # ============================================
+
+  @doc """
+  Lists all attachments for a conversation.
+
+  ## Examples
+
+      iex> list_attachments(conversation_id)
+      [%ConversationAttachment{}, ...]
+
+  """
+  @spec list_attachments(binary()) :: [ConversationAttachment.t()]
+  def list_attachments(conversation_id) do
+    ConversationAttachment
+    |> where([a], a.conversation_id == ^conversation_id)
+    |> order_by([a], asc: a.inserted_at)
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets a single attachment.
+
+  Returns nil if not found.
+  """
+  @spec get_attachment(binary()) :: ConversationAttachment.t() | nil
+  def get_attachment(id) do
+    Repo.get(ConversationAttachment, id)
+  end
+
+  @doc """
+  Gets an attachment with authorization check.
+
+  Returns `{:ok, attachment}` if found and belongs to user's conversation,
+  `{:error, :not_found}` otherwise.
+  """
+  @spec get_attachment_for_user(binary(), binary()) ::
+          {:ok, ConversationAttachment.t()} | {:error, :not_found}
+  def get_attachment_for_user(attachment_id, user_id) do
+    query =
+      from a in ConversationAttachment,
+        join: c in Conversation,
+        on: a.conversation_id == c.id,
+        where: a.id == ^attachment_id and c.user_id == ^user_id,
+        select: a
+
+    case Repo.one(query) do
+      nil -> {:error, :not_found}
+      attachment -> {:ok, attachment}
+    end
+  end
+
+  @doc """
+  Creates an attachment for a conversation.
+
+  Validates that the conversation hasn't exceeded the maximum attachment limit.
+
+  ## Examples
+
+      iex> create_attachment(%{conversation_id: id, filename: "notes.md", content: "...", size_bytes: 1024})
+      {:ok, %ConversationAttachment{}}
+
+      iex> create_attachment(%{conversation_id: id, ...}) # when at limit
+      {:error, :attachment_limit_exceeded}
+
+  """
+  @spec create_attachment(map()) ::
+          {:ok, ConversationAttachment.t()}
+          | {:error, Ecto.Changeset.t() | :attachment_limit_exceeded}
+  def create_attachment(attrs) do
+    conversation_id = attrs[:conversation_id] || attrs["conversation_id"]
+
+    # If no conversation_id provided, let changeset validation handle it
+    if conversation_id do
+      current_count = attachment_count(conversation_id)
+      max_count = ConversationAttachment.max_attachments_per_conversation()
+
+      if current_count >= max_count do
+        {:error, :attachment_limit_exceeded}
+      else
+        do_create_attachment(attrs)
+      end
+    else
+      do_create_attachment(attrs)
+    end
+  end
+
+  defp do_create_attachment(attrs) do
+    %ConversationAttachment{}
+    |> ConversationAttachment.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Deletes an attachment.
+
+  ## Examples
+
+      iex> delete_attachment(attachment)
+      {:ok, %ConversationAttachment{}}
+
+  """
+  @spec delete_attachment(ConversationAttachment.t()) ::
+          {:ok, ConversationAttachment.t()} | {:error, Ecto.Changeset.t()}
+  def delete_attachment(%ConversationAttachment{} = attachment) do
+    Repo.delete(attachment)
+  end
+
+  @doc """
+  Deletes an attachment with authorization check.
+
+  Returns `{:ok, attachment}` if deleted, `{:error, :not_found}` if not found
+  or unauthorized, `{:error, changeset}` on delete failure.
+  """
+  @spec delete_attachment_for_user(binary(), binary()) ::
+          {:ok, ConversationAttachment.t()} | {:error, :not_found | Ecto.Changeset.t()}
+  def delete_attachment_for_user(attachment_id, user_id) do
+    case get_attachment_for_user(attachment_id, user_id) do
+      {:ok, attachment} -> delete_attachment(attachment)
+      error -> error
+    end
+  end
+
+  @doc """
+  Returns the count of attachments for a conversation.
+  """
+  @spec attachment_count(binary()) :: non_neg_integer()
+  def attachment_count(conversation_id) do
+    ConversationAttachment
+    |> where([a], a.conversation_id == ^conversation_id)
+    |> Repo.aggregate(:count, :id)
+  end
+
+  @doc """
+  Returns the total size of all attachments for a conversation in bytes.
+  """
+  @spec total_attachment_size(binary()) :: non_neg_integer()
+  def total_attachment_size(conversation_id) do
+    ConversationAttachment
+    |> where([a], a.conversation_id == ^conversation_id)
+    |> Repo.aggregate(:sum, :size_bytes) || 0
+  end
+
+  @doc """
+  Checks if a conversation can accept more attachments.
+  """
+  @spec can_add_attachment?(binary()) :: boolean()
+  def can_add_attachment?(conversation_id) do
+    attachment_count(conversation_id) < ConversationAttachment.max_attachments_per_conversation()
   end
 end

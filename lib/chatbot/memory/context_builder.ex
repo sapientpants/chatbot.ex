@@ -17,6 +17,7 @@ defmodule Chatbot.Memory.ContextBuilder do
   """
 
   alias Chatbot.Chat
+  alias Chatbot.Chat.ConversationAttachment
   alias Chatbot.Memory
   alias Chatbot.Memory.Search
   alias Chatbot.Memory.Summarizer
@@ -71,9 +72,10 @@ defmodule Chatbot.Memory.ContextBuilder do
     custom_system_prompt = Keyword.get(opts, :system_prompt)
     token_budget = Keyword.get(opts, :token_budget, config(:token_budget, @default_token_budget))
 
-    # Build system prompt with memory context
+    # Build system prompt with memory and attachment context
     memory_context = build_memory_context(user_id, current_query)
-    system_prompt = build_system_prompt(custom_system_prompt, memory_context)
+    attachment_context = build_attachment_context(conversation_id)
+    system_prompt = build_system_prompt(custom_system_prompt, memory_context, attachment_context)
     system_tokens = estimate_tokens(system_prompt)
 
     # Get conversation summary if available
@@ -173,14 +175,53 @@ defmodule Chatbot.Memory.ContextBuilder do
     trunc(String.length(text) / @chars_per_token * @token_estimate_buffer)
   end
 
-  # Private functions
+  @doc """
+  Builds attachment context string for injection into system prompt.
 
-  defp build_system_prompt(nil, memory_context) do
-    @base_system_prompt <> memory_context
+  ## Parameters
+
+    * `conversation_id` - The conversation ID
+
+  ## Returns
+
+  A formatted string with attachment contents, or empty string if none.
+  """
+  @spec build_attachment_context(binary()) :: String.t()
+  def build_attachment_context(conversation_id) do
+    attachments = Chat.list_attachments(conversation_id)
+
+    if attachments == [] do
+      ""
+    else
+      attachment_text = Enum.map_join(attachments, "\n\n---\n\n", &format_attachment/1)
+
+      """
+
+      ## Attached Reference Documents
+
+      The user has attached the following markdown documents for context:
+
+      #{attachment_text}
+      """
+    end
   end
 
-  defp build_system_prompt(custom_prompt, memory_context) do
-    custom_prompt <> memory_context
+  defp format_attachment(%ConversationAttachment{} = attachment) do
+    """
+    ### File: #{attachment.filename}
+
+    #{attachment.content}
+    """
+  end
+
+  # Private functions
+
+  defp build_system_prompt(nil, memory_context, attachment_context) do
+    @base_system_prompt <> memory_context <> attachment_context
+  end
+
+  defp build_system_prompt(custom_prompt, memory_context, attachment_context) do
+    custom_prompt <> memory_context <> attachment_context
   end
 
   defp build_openai_messages(system_prompt, nil, messages) do
