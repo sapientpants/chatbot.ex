@@ -225,7 +225,12 @@ defmodule Chatbot.RAG.Pipeline do
 
     ---
 
-    When responding, cite your sources using superscript numbers (¹, ², ³, etc.) to reference the excerpts above.
+    When responding:
+    1. Use superscript numbers (¹, ², ³, etc.) to cite sources inline
+    2. At the end of your response, include a "References" section listing all cited sources in format:
+       ## References
+       ¹ filename.md - Section Name
+       ² other-file.md - Section Name
     """
 
     header_footer_chars = String.length(header) + String.length(footer)
