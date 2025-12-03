@@ -17,10 +17,10 @@ defmodule Chatbot.Memory.ContextBuilder do
   """
 
   alias Chatbot.Chat
-  alias Chatbot.Chat.ConversationAttachment
   alias Chatbot.Memory
   alias Chatbot.Memory.Search
   alias Chatbot.Memory.Summarizer
+  alias Chatbot.RAG.Pipeline
 
   @default_token_budget 4000
 
@@ -74,7 +74,7 @@ defmodule Chatbot.Memory.ContextBuilder do
 
     # Build system prompt with memory and attachment context
     memory_context = build_memory_context(user_id, current_query)
-    attachment_context = build_attachment_context(conversation_id)
+    attachment_context = build_attachment_context(conversation_id, current_query)
     system_prompt = build_system_prompt(custom_system_prompt, memory_context, attachment_context)
     system_tokens = estimate_tokens(system_prompt)
 
@@ -178,40 +178,41 @@ defmodule Chatbot.Memory.ContextBuilder do
   @doc """
   Builds attachment context string for injection into system prompt.
 
+  Uses RAG-based retrieval when enabled and chunks are available.
+  Falls back to empty string if no relevant chunks are found (per user preference).
+
   ## Parameters
 
     * `conversation_id` - The conversation ID
+    * `current_query` - The user's current query for relevance matching
 
   ## Returns
 
-  A formatted string with attachment contents, or empty string if none.
+  A formatted string with relevant attachment excerpts and citations,
+  or empty string if no relevant content found.
   """
-  @spec build_attachment_context(binary()) :: String.t()
-  def build_attachment_context(conversation_id) do
-    attachments = Chat.list_attachments(conversation_id)
+  @spec build_attachment_context(binary(), String.t()) :: String.t()
+  def build_attachment_context(conversation_id, current_query) do
+    # RAG enabled and we have a query - use semantic retrieval
+    if Pipeline.enabled?() and current_query != "" do
+      case Pipeline.retrieve_context(conversation_id, current_query,
+             token_budget: rag_config(:token_budget, 2000)
+           ) do
+        {:ok, context} when context != "" ->
+          context
 
-    if attachments == [] do
-      ""
+        {:ok, ""} ->
+          # No relevant chunks found - return nothing per user preference
+          ""
+
+        {:error, _reason} ->
+          # Error during retrieval - return nothing
+          ""
+      end
     else
-      attachment_text = Enum.map_join(attachments, "\n\n---\n\n", &format_attachment/1)
-
-      """
-
-      ## Attached Reference Documents
-
-      The user has attached the following markdown documents for context:
-
-      #{attachment_text}
-      """
+      # RAG disabled or no query - return nothing
+      ""
     end
-  end
-
-  defp format_attachment(%ConversationAttachment{} = attachment) do
-    """
-    ### File: #{attachment.filename}
-
-    #{attachment.content}
-    """
   end
 
   # Private functions
@@ -273,5 +274,9 @@ defmodule Chatbot.Memory.ContextBuilder do
 
   defp config(key, default) do
     Keyword.get(Application.get_env(:chatbot, :memory, []), key, default)
+  end
+
+  defp rag_config(key, default) do
+    Keyword.get(Application.get_env(:chatbot, :rag, []), key, default)
   end
 end

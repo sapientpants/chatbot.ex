@@ -353,7 +353,7 @@ defmodule Chatbot.Memory.ContextBuilderTest do
     end
   end
 
-  describe "build_attachment_context/1" do
+  describe "build_attachment_context/2" do
     setup do
       user = user_fixture()
       {:ok, conversation} = Chatbot.Chat.create_conversation(%{user_id: user.id, title: "Test"})
@@ -361,11 +361,13 @@ defmodule Chatbot.Memory.ContextBuilderTest do
     end
 
     test "returns empty string when no attachments", %{conversation: conversation} do
-      result = ContextBuilder.build_attachment_context(conversation.id)
+      result = ContextBuilder.build_attachment_context(conversation.id, "test query")
       assert result == ""
     end
 
-    test "includes attachment content", %{conversation: conversation} do
+    test "returns empty string when RAG is disabled", %{conversation: conversation} do
+      # RAG is disabled in test config, so attachment context always returns empty
+      # (no fallback to full file content per user preference)
       {:ok, _attachment} =
         Chatbot.Chat.create_attachment(%{
           conversation_id: conversation.id,
@@ -374,15 +376,14 @@ defmodule Chatbot.Memory.ContextBuilderTest do
           size_bytes: 50
         })
 
-      result = ContextBuilder.build_attachment_context(conversation.id)
+      result = ContextBuilder.build_attachment_context(conversation.id, "test query")
 
-      assert result =~ "Attached Reference Documents"
-      assert result =~ "notes.md"
-      assert result =~ "Important Notes"
+      # With RAG disabled, returns empty string
+      assert result == ""
     end
 
-    test "includes multiple attachments", %{conversation: conversation} do
-      {:ok, _attachment1} =
+    test "returns empty string when query is empty", %{conversation: conversation} do
+      {:ok, _attachment} =
         Chatbot.Chat.create_attachment(%{
           conversation_id: conversation.id,
           filename: "file1.md",
@@ -390,20 +391,9 @@ defmodule Chatbot.Memory.ContextBuilderTest do
           size_bytes: 10
         })
 
-      {:ok, _attachment2} =
-        Chatbot.Chat.create_attachment(%{
-          conversation_id: conversation.id,
-          filename: "file2.md",
-          content: "Content 2",
-          size_bytes: 10
-        })
-
-      result = ContextBuilder.build_attachment_context(conversation.id)
-
-      assert result =~ "file1.md"
-      assert result =~ "file2.md"
-      assert result =~ "Content 1"
-      assert result =~ "Content 2"
+      # Empty query returns empty context
+      result = ContextBuilder.build_attachment_context(conversation.id, "")
+      assert result == ""
     end
   end
 
@@ -422,10 +412,12 @@ defmodule Chatbot.Memory.ContextBuilderTest do
       {:ok, user: user, conversation: conversation}
     end
 
-    test "includes attachment context in system prompt", %{
+    test "does not include attachment context when RAG is disabled", %{
       user: user,
       conversation: conversation
     } do
+      # With RAG disabled in test config, attachments are not included in context
+      # (no fallback to full file content per user preference)
       {:ok, _attachment} =
         Chatbot.Chat.create_attachment(%{
           conversation_id: conversation.id,
@@ -437,8 +429,9 @@ defmodule Chatbot.Memory.ContextBuilderTest do
       {:ok, messages} = ContextBuilder.build_context(conversation.id, user.id)
 
       system_prompt = hd(messages).content
-      assert system_prompt =~ "Reference Document"
-      assert system_prompt =~ "Key information here"
+      # With RAG disabled, attachment content is NOT included
+      refute system_prompt =~ "Reference Document"
+      refute system_prompt =~ "Key information here"
     end
   end
 end

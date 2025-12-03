@@ -40,3 +40,6 @@ config :phoenix_live_view,
 # Configure Hammer rate limiting for test environment
 config :hammer,
   backend: {Hammer.Backend.ETS, [expiry_ms: 60_000 * 60 * 4, cleanup_interval_ms: 60_000 * 10]}
+
+# Disable RAG in tests to avoid needing to mock embedding/LLM services
+config :chatbot, :rag, enabled: false
