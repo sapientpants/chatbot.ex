@@ -20,6 +20,7 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   alias Chatbot.ModelCache
   alias ChatbotWeb.Live.Chat.MessageProcessor
   alias ChatbotWeb.Live.Chat.TaskRegistry
+  alias ChatbotWeb.Live.Chat.UploadHelpers
   alias ChatbotWeb.Plugs.RateLimiter
 
   require Logger
@@ -106,6 +107,9 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
 
   @doc """
   Sends a user message and starts streaming AI response.
+
+  If there are pending file uploads, they are automatically uploaded before
+  processing the message, ensuring attached documents are available for RAG.
   """
   @spec send_message_with_streaming(String.t(), Phoenix.LiveView.Socket.t()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
@@ -117,6 +121,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
 
       case RateLimiter.check_message_rate_limit(user_id) do
         :ok ->
+          # Auto-upload pending files before processing message
+          socket = auto_upload_pending_files(socket)
           # MessageProcessor handles atomic task registration
           MessageProcessor.process(content, socket)
 
@@ -218,5 +224,23 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
     user_id = socket.assigns.current_user.id
     task_pid = socket.assigns[:streaming_task_pid]
     if task_pid, do: unregister_task(user_id, task_pid)
+  end
+
+  defp auto_upload_pending_files(socket) do
+    uploads = socket.assigns[:uploads]
+    entries = uploads && uploads[:markdown_files] && uploads.markdown_files.entries
+
+    if entries && entries != [] do
+      case UploadHelpers.handle_upload(socket) do
+        {:ok, updated_socket} ->
+          updated_socket
+
+        {:error, updated_socket, error_msg} ->
+          Logger.warning("Auto-upload failed: #{error_msg}")
+          put_flash(updated_socket, :error, error_msg)
+      end
+    else
+      socket
+    end
   end
 end
