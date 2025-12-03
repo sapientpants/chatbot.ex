@@ -225,9 +225,11 @@ defmodule Chatbot.RAG.Pipeline do
 
     ---
 
-    When responding:
-    1. Use superscript numbers (¹, ², ³, etc.) to cite sources inline
-    2. At the end of your response, include a "References" section listing all cited sources in format:
+    IMPORTANT Citation Rules:
+    1. Each excerpt above has a UNIQUE number (¹, ², ³, etc.)
+    2. Use the EXACT number shown for each excerpt when citing it
+    3. Different excerpts MUST use different numbers - never cite two different excerpts with the same number
+    4. At the end of your response, include a "References" section listing each cited source ONCE:
        ## References
        ¹ filename.md - Section Name
        ² other-file.md - Section Name
