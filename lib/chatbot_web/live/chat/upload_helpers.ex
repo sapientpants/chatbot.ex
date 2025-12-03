@@ -149,4 +149,14 @@ defmodule ChatbotWeb.Live.Chat.UploadHelpers do
         {:error, socket, "Failed to remove attachment"}
     end
   end
+
+  @doc """
+  Cancels all pending file uploads.
+  """
+  @spec cancel_pending_uploads(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
+  def cancel_pending_uploads(socket) do
+    Enum.reduce(socket.assigns.uploads.markdown_files.entries, socket, fn entry, acc ->
+      cancel_upload(acc, :markdown_files, entry.ref)
+    end)
+  end
 end

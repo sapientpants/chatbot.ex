@@ -158,6 +158,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
           |> assign(:current_conversation, conversation)
           |> stream(:messages, [], reset: true)
           |> assign(:conversations, conversations)
+          |> assign(:attachments, [])
+          |> UploadHelpers.cancel_pending_uploads()
 
         socket =
           if opts[:reset_streaming] do
