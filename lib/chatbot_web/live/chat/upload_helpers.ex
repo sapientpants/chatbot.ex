@@ -55,8 +55,6 @@ defmodule ChatbotWeb.Live.Chat.UploadHelpers do
     end
   end
 
-  # Path is provided by Phoenix's upload handling - safe temporary file path
-  @sobelow_skip ["Traversal.FileModule"]
   defp do_handle_upload(socket, conversation_id) do
     current_count = Chat.attachment_count(conversation_id)
     pending_count = length(socket.assigns.uploads.markdown_files.entries)
@@ -65,28 +63,59 @@ defmodule ChatbotWeb.Live.Chat.UploadHelpers do
     if current_count + pending_count > max_count do
       {:error, socket, "Maximum #{max_count} attachments per conversation"}
     else
-      uploaded_attachments =
+      results =
         consume_uploaded_entries(socket, :markdown_files, fn %{path: path}, entry ->
-          content = File.read!(path)
-
-          attrs = %{
-            conversation_id: conversation_id,
-            filename: entry.client_name,
-            content: content,
-            content_type: entry.client_type || "text/markdown",
-            size_bytes: entry.client_size
-          }
-
-          case Chat.create_attachment(attrs) do
-            {:ok, attachment} -> {:ok, attachment}
-            {:error, _changeset} -> {:postpone, nil}
-          end
+          process_upload_entry(path, entry, conversation_id)
         end)
 
-      updated_socket =
-        assign(socket, :attachments, socket.assigns.attachments ++ uploaded_attachments)
+      build_upload_result(socket, results)
+    end
+  end
 
+  # sobelow_skip ["Traversal.FileModule"]
+  # Path is provided by Phoenix's upload handling - safe temporary file path
+  defp process_upload_entry(path, entry, conversation_id) do
+    case File.read(path) do
+      {:ok, content} ->
+        save_attachment(content, entry, conversation_id)
+
+      {:error, _reason} ->
+        {:ok, {:error, entry.client_name}}
+    end
+  end
+
+  defp save_attachment(content, entry, conversation_id) do
+    attrs = %{
+      conversation_id: conversation_id,
+      filename: entry.client_name,
+      content: content,
+      content_type: entry.client_type || "text/markdown",
+      size_bytes: entry.client_size
+    }
+
+    case Chat.create_attachment(attrs) do
+      {:ok, attachment} -> {:ok, {:ok, attachment}}
+      {:error, _changeset} -> {:ok, {:error, entry.client_name}}
+    end
+  end
+
+  defp build_upload_result(socket, results) do
+    {successes, failures} =
+      Enum.split_with(results, fn
+        {:ok, _attachment} -> true
+        {:error, _name} -> false
+      end)
+
+    uploaded_attachments = Enum.map(successes, fn {:ok, attachment} -> attachment end)
+
+    updated_socket =
+      assign(socket, :attachments, socket.assigns.attachments ++ uploaded_attachments)
+
+    if failures == [] do
       {:ok, updated_socket}
+    else
+      failed_names = Enum.map_join(failures, ", ", fn {:error, name} -> name end)
+      {:error, updated_socket, "Failed to upload: #{failed_names}"}
     end
   end
 

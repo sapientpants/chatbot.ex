@@ -46,9 +46,24 @@ defmodule Chatbot.Chat.ConversationAttachment do
     |> validate_required([:filename, :content, :size_bytes, :conversation_id])
     |> validate_length(:filename, max: 255)
     |> validate_number(:size_bytes, less_than_or_equal_to: @max_file_size)
+    |> validate_content_length()
     |> validate_file_extension()
     |> foreign_key_constraint(:conversation_id)
     |> maybe_put_uuid()
+  end
+
+  defp validate_content_length(changeset) do
+    case get_field(changeset, :content) do
+      nil ->
+        changeset
+
+      content when is_binary(content) ->
+        if byte_size(content) <= @max_file_size do
+          changeset
+        else
+          add_error(changeset, :content, "content exceeds maximum file size")
+        end
+    end
   end
 
   defp validate_file_extension(changeset) do
@@ -71,7 +86,7 @@ defmodule Chatbot.Chat.ConversationAttachment do
     if get_field(changeset, :id) do
       changeset
     else
-      put_change(changeset, :id, Ecto.UUID.generate())
+      put_change(changeset, :id, Chatbot.Repo.generate_uuid())
     end
   end
 

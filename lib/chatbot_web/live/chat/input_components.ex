@@ -87,6 +87,7 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
           @is_streaming && "btn-disabled"
         ]}
         title={"Attach markdown files (max #{@max_files} files, #{@max_size_kb}KB each)"}
+        aria-label="Attach markdown files"
       >
         <.icon name="hero-paper-clip" class="w-4 h-4" />
         <%= if @uploads do %>
