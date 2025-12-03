@@ -168,11 +168,19 @@ const Hooks = {
       // Create a regex that matches all superscript patterns (two-digit first, then single)
       const superscriptPattern = /¹⁰|¹¹|¹²|¹³|¹⁴|¹⁵|¹⁶|¹⁷|¹⁸|¹⁹|²⁰|[¹²³⁴⁵⁶⁷⁸⁹]/g
 
+      // Find the References section header if it exists
+      const referencesHeader = this.findReferencesHeader()
+
       // First pass: collect all citations in order of appearance to build renumbering map
+      // Only process citations BEFORE the References section
       const walker1 = document.createTreeWalker(this.el, NodeFilter.SHOW_TEXT, null, false)
       const citationOrder = [] // Original indices in order of first appearance
       let node1
       while ((node1 = walker1.nextNode())) {
+        // Stop when we reach the References section
+        if (referencesHeader && this.isInOrAfterReferences(node1, referencesHeader)) {
+          break
+        }
         superscriptPattern.lastIndex = 0
         let match
         while ((match = superscriptPattern.exec(node1.textContent)) !== null) {
@@ -201,11 +209,20 @@ const Hooks = {
         }
       })
 
-      // Second pass: replace citations with renumbered clickable links
+      // Reorder and renumber the References section if it exists
+      if (referencesHeader) {
+        this.reorderReferencesSection(referencesHeader, renumberMap)
+      }
+
+      // Second pass: replace citations with renumbered clickable links (outside References)
       const walker2 = document.createTreeWalker(this.el, NodeFilter.SHOW_TEXT, null, false)
       const nodesToProcess = []
       let node2
       while ((node2 = walker2.nextNode())) {
+        // Skip nodes in/after the References section (already handled)
+        if (referencesHeader && this.isInOrAfterReferences(node2, referencesHeader)) {
+          continue
+        }
         superscriptPattern.lastIndex = 0
         if (superscriptPattern.test(node2.textContent)) {
           nodesToProcess.push(node2)
@@ -260,6 +277,134 @@ const Hooks = {
         // Replace the text node
         textNode.parentNode.replaceChild(fragment, textNode)
       })
+    },
+
+    // Find the References heading element
+    findReferencesHeader() {
+      // Look for h2 with "References" text
+      const headings = this.el.querySelectorAll("h2, h3, strong")
+      for (const heading of headings) {
+        if (heading.textContent.trim().toLowerCase() === "references") {
+          return heading
+        }
+      }
+      return null
+    },
+
+    // Check if a node is in or after the References section
+    isInOrAfterReferences(node, referencesHeader) {
+      // Compare document position
+      const position = referencesHeader.compareDocumentPosition(node)
+      // Node is after or contained by referencesHeader's parent
+      return (position & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 ||
+             (position & Node.DOCUMENT_POSITION_CONTAINED_BY) !== 0
+    },
+
+    // Reorder and renumber the References section
+    reorderReferencesSection(referencesHeader, renumberMap) {
+      const superscriptPattern = /¹⁰|¹¹|¹²|¹³|¹⁴|¹⁵|¹⁶|¹⁷|¹⁸|¹⁹|²⁰|[¹²³⁴⁵⁶⁷⁸⁹]/g
+
+      // Find the container for reference items (usually following siblings or parent's children)
+      const container = referencesHeader.parentElement
+      if (!container) return
+
+      // Collect reference lines: look for elements that start with a superscript
+      const referenceItems = []
+      let sibling = referencesHeader.nextElementSibling || referencesHeader.parentElement.nextElementSibling
+
+      // Also check if references are in a list or paragraphs after the heading
+      const possibleContainers = container.parentElement ?
+        Array.from(container.parentElement.children).filter(el => {
+          const position = referencesHeader.compareDocumentPosition(el)
+          return (position & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+        }) : []
+
+      // Try to find reference items in various formats
+      for (const el of [sibling, ...possibleContainers]) {
+        if (!el) continue
+
+        // Check if this element contains a superscript at the start
+        const text = el.textContent
+        superscriptPattern.lastIndex = 0
+        const match = superscriptPattern.exec(text)
+
+        if (match && match.index < 3) { // Superscript near the start
+          const originalIndex = this.SUPERSCRIPTS[match[0]]
+          const newIndex = renumberMap[originalIndex]
+          if (newIndex) {
+            referenceItems.push({
+              element: el,
+              originalIndex,
+              newIndex,
+              html: el.innerHTML
+            })
+          }
+        }
+      }
+
+      // Sort by new index and renumber
+      referenceItems.sort((a, b) => a.newIndex - b.newIndex)
+
+      // Update each reference item with the correct number
+      referenceItems.forEach(item => {
+        const newSuperscript = this.toSuperscript(item.newIndex)
+        const source = this.renumberedSources[item.newIndex]
+
+        // Replace the old superscript with the new one and make it clickable
+        const walker = document.createTreeWalker(item.element, NodeFilter.SHOW_TEXT, null, false)
+        let textNode
+        let processed = false
+
+        while ((textNode = walker.nextNode()) && !processed) {
+          superscriptPattern.lastIndex = 0
+          const match = superscriptPattern.exec(textNode.textContent)
+
+          if (match) {
+            const text = textNode.textContent
+            const fragment = document.createDocumentFragment()
+
+            // Text before superscript
+            if (match.index > 0) {
+              fragment.appendChild(document.createTextNode(text.slice(0, match.index)))
+            }
+
+            // Create clickable superscript
+            if (source) {
+              const span = document.createElement("span")
+              span.textContent = newSuperscript
+              span.className = "citation-link cursor-pointer text-primary hover:underline font-semibold"
+              span.dataset.sourceIndex = item.newIndex
+              const filename = source.filename || source["filename"]
+              span.title = `Click to view source: ${filename}`
+              span.addEventListener("click", (e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                this.showSource(source, item.newIndex)
+              })
+              fragment.appendChild(span)
+            } else {
+              fragment.appendChild(document.createTextNode(newSuperscript))
+            }
+
+            // Text after superscript
+            fragment.appendChild(document.createTextNode(text.slice(match.index + match[0].length)))
+
+            textNode.parentNode.replaceChild(fragment, textNode)
+            processed = true
+          }
+        }
+      })
+
+      // Reorder DOM elements if needed
+      if (referenceItems.length > 1) {
+        const parent = referenceItems[0].element.parentElement
+        if (parent) {
+          // Sort elements by their new index
+          referenceItems.forEach(item => {
+            parent.appendChild(item.element)
+          })
+        }
+      }
     },
 
     showSource(source, displayIndex) {
