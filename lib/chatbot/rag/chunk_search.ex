@@ -47,9 +47,7 @@ defmodule Chatbot.RAG.ChunkSearch do
   @spec search(binary(), String.t(), keyword()) ::
           {:ok, [AttachmentChunk.t()]} | {:error, term()}
   def search(conversation_id, query_text, opts \\ []) do
-    limit = Keyword.get(opts, :limit, config(:retrieval_limit, 10))
-    semantic_weight = Keyword.get(opts, :semantic_weight, config(:semantic_weight, 0.6))
-    keyword_weight = Keyword.get(opts, :keyword_weight, config(:keyword_weight, 0.4))
+    {limit, semantic_weight, keyword_weight} = parse_weights(opts)
     deduplicate? = Keyword.get(opts, :deduplicate, true)
 
     with {:ok, query_embedding} <- SearchUtils.get_query_embedding(query_text) do
@@ -91,9 +89,7 @@ defmodule Chatbot.RAG.ChunkSearch do
   @spec search_multi(binary(), [{String.t(), [float()]}], keyword()) ::
           {:ok, [AttachmentChunk.t()]} | {:error, term()}
   def search_multi(conversation_id, query_embeddings, opts \\ []) do
-    limit = Keyword.get(opts, :limit, config(:retrieval_limit, 10))
-    semantic_weight = Keyword.get(opts, :semantic_weight, config(:semantic_weight, 0.6))
-    keyword_weight = Keyword.get(opts, :keyword_weight, config(:keyword_weight, 0.4))
+    {limit, semantic_weight, keyword_weight} = parse_weights(opts)
 
     # Collect results from all queries
     all_results =
@@ -253,6 +249,13 @@ defmodule Chatbot.RAG.ChunkSearch do
 
   defp maybe_filter_attachments(query, attachment_ids) when is_list(attachment_ids) do
     where(query, [c], c.attachment_id in ^attachment_ids)
+  end
+
+  defp parse_weights(opts) do
+    limit = Keyword.get(opts, :limit, config(:retrieval_limit, 10))
+    semantic_weight = Keyword.get(opts, :semantic_weight, config(:semantic_weight, 0.6))
+    keyword_weight = Keyword.get(opts, :keyword_weight, config(:keyword_weight, 0.4))
+    {limit, semantic_weight, keyword_weight}
   end
 
   defp config(key, default) do

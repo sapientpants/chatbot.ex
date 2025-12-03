@@ -234,26 +234,16 @@ defmodule Chatbot.RAG.Pipeline do
   end
 
   defp format_excerpt(chunk, index) do
-    superscript = get_superscript(index)
-    filename = get_filename(chunk)
-    section = get_section(chunk)
-
-    section_info = if section != "", do: " (Section: #{section})", else: ""
+    header = build_excerpt_header(chunk, index)
 
     """
-    #{superscript} **#{filename}**#{section_info}
-
+    #{header}
     #{chunk.content}
     """
   end
 
   defp format_excerpt_truncated(chunk, index, max_chars) do
-    superscript = get_superscript(index)
-    filename = get_filename(chunk)
-    section = get_section(chunk)
-
-    section_info = if section != "", do: " (Section: #{section})", else: ""
-    header = "#{superscript} **#{filename}**#{section_info}\n\n"
+    header = build_excerpt_header(chunk, index) <> "\n\n"
     header_chars = String.length(header)
 
     content_budget = max_chars - header_chars - 10
@@ -264,6 +254,15 @@ defmodule Chatbot.RAG.Pipeline do
     else
       nil
     end
+  end
+
+  defp build_excerpt_header(chunk, index) do
+    superscript = get_superscript(index)
+    filename = get_filename(chunk)
+    section = get_section(chunk)
+    section_info = if section != "", do: " (Section: #{section})", else: ""
+
+    "#{superscript} **#{filename}**#{section_info}"
   end
 
   defp get_superscript(index) when index >= 1 and index <= 20 do
