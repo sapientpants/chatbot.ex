@@ -2,6 +2,7 @@ defmodule Chatbot.Chat.AttachmentChunkTest do
   use Chatbot.DataCase, async: true
 
   alias Chatbot.Chat.AttachmentChunk
+  alias Chatbot.Chat.ConversationAttachment
 
   import Chatbot.Fixtures
 
@@ -194,13 +195,15 @@ defmodule Chatbot.Chat.AttachmentChunkTest do
       attachment = attachment_fixture_without_chunks(conversation: conversation)
       chunk = attachment_chunk_fixture(attachment: attachment)
 
-      # Verify chunk exists
+      # Verify chunk and attachment exist
       assert Repo.get(AttachmentChunk, chunk.id) != nil
+      assert Repo.get(ConversationAttachment, attachment.id) != nil
 
       # Delete conversation
       Repo.delete!(conversation)
 
-      # Chunk should be cascade deleted
+      # Both attachment and chunk should be cascade deleted
+      assert Repo.get(ConversationAttachment, attachment.id) == nil
       assert Repo.get(AttachmentChunk, chunk.id) == nil
     end
   end

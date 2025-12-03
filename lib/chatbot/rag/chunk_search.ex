@@ -59,7 +59,7 @@ defmodule Chatbot.RAG.ChunkSearch do
       fused_ids =
         SearchUtils.rrf_fusion(semantic_results, keyword_results, semantic_weight, keyword_weight)
 
-      # Fetch full records in fused order
+      # Fetch 2x limit to account for deduplication removing some results
       fetched_chunks = fetch_in_order(fused_ids, limit * 2)
 
       # Deduplicate if enabled

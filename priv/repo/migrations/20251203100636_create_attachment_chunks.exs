@@ -15,6 +15,7 @@ defmodule Chatbot.Repo.Migrations.CreateAttachmentChunks do
 
       add :content, :text, null: false
       add :chunk_index, :integer, null: false
+      # 1024 dimensions to match Ollama nomic-embed-text model (same as user_memories)
       add :embedding, :vector, size: 1024
       add :metadata, :map, default: %{}
       add :content_hash, :string, size: 64

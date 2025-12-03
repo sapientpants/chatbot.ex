@@ -371,17 +371,21 @@ defmodule Chatbot.Chat do
   end
 
   defp do_create_attachment_with_chunks(attrs) do
-    # Create attachment and process chunks in a transaction
-    Repo.transaction(fn ->
-      with {:ok, attachment} <- do_create_attachment(attrs),
-           {:ok, _chunks} <- process_attachment_chunks(attachment) do
-        attachment
-      else
-        {:error, reason} ->
-          Logger.error("Failed to create attachment with chunks: #{inspect(reason)}")
-          Repo.rollback(reason)
-      end
-    end)
+    # Skip transaction overhead when RAG is disabled
+    if rag_enabled?() do
+      Repo.transaction(fn ->
+        with {:ok, attachment} <- do_create_attachment(attrs),
+             {:ok, _chunks} <- process_attachment_chunks(attachment) do
+          attachment
+        else
+          {:error, reason} ->
+            Logger.error("Failed to create attachment with chunks: #{inspect(reason)}")
+            Repo.rollback(reason)
+        end
+      end)
+    else
+      do_create_attachment(attrs)
+    end
   end
 
   defp do_create_attachment(attrs) do
