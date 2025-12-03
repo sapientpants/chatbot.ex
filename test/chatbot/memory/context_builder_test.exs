@@ -352,4 +352,93 @@ defmodule Chatbot.Memory.ContextBuilderTest do
       assert length(non_system_messages) < 50
     end
   end
+
+  describe "build_attachment_context/1" do
+    setup do
+      user = user_fixture()
+      {:ok, conversation} = Chatbot.Chat.create_conversation(%{user_id: user.id, title: "Test"})
+      {:ok, user: user, conversation: conversation}
+    end
+
+    test "returns empty string when no attachments", %{conversation: conversation} do
+      result = ContextBuilder.build_attachment_context(conversation.id)
+      assert result == ""
+    end
+
+    test "includes attachment content", %{conversation: conversation} do
+      {:ok, _attachment} =
+        Chatbot.Chat.create_attachment(%{
+          conversation_id: conversation.id,
+          filename: "notes.md",
+          content: "# Important Notes\n\nThis is important.",
+          size_bytes: 50
+        })
+
+      result = ContextBuilder.build_attachment_context(conversation.id)
+
+      assert result =~ "Attached Reference Documents"
+      assert result =~ "notes.md"
+      assert result =~ "Important Notes"
+    end
+
+    test "includes multiple attachments", %{conversation: conversation} do
+      {:ok, _attachment1} =
+        Chatbot.Chat.create_attachment(%{
+          conversation_id: conversation.id,
+          filename: "file1.md",
+          content: "Content 1",
+          size_bytes: 10
+        })
+
+      {:ok, _attachment2} =
+        Chatbot.Chat.create_attachment(%{
+          conversation_id: conversation.id,
+          filename: "file2.md",
+          content: "Content 2",
+          size_bytes: 10
+        })
+
+      result = ContextBuilder.build_attachment_context(conversation.id)
+
+      assert result =~ "file1.md"
+      assert result =~ "file2.md"
+      assert result =~ "Content 1"
+      assert result =~ "Content 2"
+    end
+  end
+
+  describe "build_context/3 with attachments" do
+    setup do
+      user = user_fixture()
+      {:ok, conversation} = Chatbot.Chat.create_conversation(%{user_id: user.id, title: "Test"})
+
+      {:ok, _msg} =
+        Chatbot.Chat.create_message(%{
+          conversation_id: conversation.id,
+          role: "user",
+          content: "Hello"
+        })
+
+      {:ok, user: user, conversation: conversation}
+    end
+
+    test "includes attachment context in system prompt", %{
+      user: user,
+      conversation: conversation
+    } do
+      {:ok, _attachment} =
+        Chatbot.Chat.create_attachment(%{
+          conversation_id: conversation.id,
+          filename: "reference.md",
+          content: "# Reference Document\n\nKey information here.",
+          size_bytes: 50
+        })
+
+      {:ok, messages} = ContextBuilder.build_context(conversation.id, user.id)
+
+      system_prompt = hd(messages).content
+      assert system_prompt =~ "Reference Document"
+      assert system_prompt =~ "Key information here"
+    end
+  end
 end

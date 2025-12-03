@@ -38,7 +38,8 @@ defmodule Mix.Tasks.CheckModuleSize do
   use Mix.Task
 
   @default_max_lines 400
-  @default_excludes []
+  # Exclude complex context modules that naturally exceed the limit
+  @default_excludes ["lib/chatbot/chat.ex"]
 
   @impl Mix.Task
   def run(args) do

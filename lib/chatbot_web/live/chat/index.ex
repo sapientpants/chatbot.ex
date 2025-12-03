@@ -11,6 +11,7 @@ defmodule ChatbotWeb.ChatLive.Index do
 
   alias Chatbot.Chat
   alias ChatbotWeb.Live.Chat.StreamingHelpers
+  alias ChatbotWeb.Live.Chat.UploadHelpers
 
   @impl Phoenix.LiveView
   def mount(_params, _session, socket) do
@@ -61,6 +62,8 @@ defmodule ChatbotWeb.ChatLive.Index do
       |> assign(:streaming_task_pid, nil)
       |> assign(:sidebar_open, false)
       |> assign(:form, to_form(%{"content" => ""}, as: :message))
+      |> UploadHelpers.configure_uploads()
+      |> UploadHelpers.load_attachments()
 
     # Load available models asynchronously only on connected mount
     if connected?(socket) do
@@ -117,6 +120,32 @@ defmodule ChatbotWeb.ChatLive.Index do
   end
 
   @impl Phoenix.LiveView
+  def handle_event("validate_upload", _params, socket) do
+    {:noreply, socket}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("upload_files", _params, socket) do
+    case UploadHelpers.handle_upload(socket) do
+      {:ok, socket} -> {:noreply, socket}
+      {:error, socket, message} -> {:noreply, put_flash(socket, :error, message)}
+    end
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("cancel_upload", %{"ref" => ref}, socket) do
+    {:noreply, UploadHelpers.cancel_upload_entry(socket, ref)}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("remove_attachment", %{"id" => attachment_id}, socket) do
+    case UploadHelpers.remove_attachment(socket, attachment_id) do
+      {:ok, socket} -> {:noreply, socket}
+      {:error, socket, message} -> {:noreply, put_flash(socket, :error, message)}
+    end
+  end
+
+  @impl Phoenix.LiveView
   def render(assigns) do
     ~H"""
     <div class="flex h-screen bg-base-100 relative">
@@ -157,7 +186,12 @@ defmodule ChatbotWeb.ChatLive.Index do
         
     <!-- Chat Content -->
         <%= if not @has_messages and not @is_streaming do %>
-          <.empty_chat_state form={@form} is_streaming={@is_streaming} />
+          <.empty_chat_state
+            form={@form}
+            is_streaming={@is_streaming}
+            uploads={@uploads}
+            attachments={@attachments}
+          />
         <% else %>
           <.messages_container
             messages={@streams.messages}
@@ -165,7 +199,12 @@ defmodule ChatbotWeb.ChatLive.Index do
             streaming_chunks={@streaming_chunks}
             last_valid_html={@last_valid_html}
           />
-          <.message_input_form form={@form} is_streaming={@is_streaming} />
+          <.message_input_form
+            form={@form}
+            is_streaming={@is_streaming}
+            uploads={@uploads}
+            attachments={@attachments}
+          />
         <% end %>
       </main>
     </div>

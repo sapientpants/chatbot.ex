@@ -75,4 +75,24 @@ defmodule Chatbot.Fixtures do
 
     message
   end
+
+  @doc """
+  Generate an attachment.
+  """
+  def attachment_fixture(attrs \\ %{}) do
+    conversation = attrs[:conversation] || conversation_fixture()
+    default_content = "# Test Attachment\n\nThis is test content."
+
+    {:ok, attachment} =
+      attrs
+      |> Enum.into(%{
+        conversation_id: conversation.id,
+        filename: "test_#{System.unique_integer([:positive])}.md",
+        content: default_content,
+        size_bytes: byte_size(default_content)
+      })
+      |> Chat.create_attachment()
+
+    attachment
+  end
 end
