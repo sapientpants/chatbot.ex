@@ -152,27 +152,64 @@ const Hooks = {
       }
     },
 
+    // Convert number to superscript string
+    toSuperscript(num) {
+      const superscripts = {
+        1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶", 7: "⁷", 8: "⁸", 9: "⁹",
+        10: "¹⁰", 11: "¹¹", 12: "¹²", 13: "¹³", 14: "¹⁴", 15: "¹⁵",
+        16: "¹⁶", 17: "¹⁷", 18: "¹⁸", 19: "¹⁹", 20: "²⁰"
+      }
+      return superscripts[num] || `[${num}]`
+    },
+
     highlightCitations() {
       if (this.sources.length === 0) return
 
       // Create a regex that matches all superscript patterns (two-digit first, then single)
       const superscriptPattern = /¹⁰|¹¹|¹²|¹³|¹⁴|¹⁵|¹⁶|¹⁷|¹⁸|¹⁹|²⁰|[¹²³⁴⁵⁶⁷⁸⁹]/g
 
-      // Walk through all text nodes
-      const walker = document.createTreeWalker(
-        this.el,
-        NodeFilter.SHOW_TEXT,
-        null,
-        false
-      )
-
-      const nodesToProcess = []
-      let node
-      while ((node = walker.nextNode())) {
-        if (superscriptPattern.test(node.textContent)) {
-          nodesToProcess.push(node)
+      // First pass: collect all citations in order of appearance to build renumbering map
+      const walker1 = document.createTreeWalker(this.el, NodeFilter.SHOW_TEXT, null, false)
+      const citationOrder = [] // Original indices in order of first appearance
+      let node1
+      while ((node1 = walker1.nextNode())) {
+        superscriptPattern.lastIndex = 0
+        let match
+        while ((match = superscriptPattern.exec(node1.textContent)) !== null) {
+          const originalIndex = this.SUPERSCRIPTS[match[0]]
+          if (originalIndex && !citationOrder.includes(originalIndex)) {
+            citationOrder.push(originalIndex)
+          }
         }
-        // Reset regex lastIndex for next test
+      }
+
+      // Build mapping: original index -> new sequential index (starting from 1)
+      const renumberMap = {}
+      citationOrder.forEach((originalIndex, i) => {
+        renumberMap[originalIndex] = i + 1
+      })
+
+      // Build renumbered sources for the modal
+      this.renumberedSources = {}
+      citationOrder.forEach((originalIndex, i) => {
+        const source = this.sources.find(s => (s.index || s["index"]) === originalIndex)
+        if (source) {
+          this.renumberedSources[i + 1] = {
+            ...source,
+            displayIndex: i + 1
+          }
+        }
+      })
+
+      // Second pass: replace citations with renumbered clickable links
+      const walker2 = document.createTreeWalker(this.el, NodeFilter.SHOW_TEXT, null, false)
+      const nodesToProcess = []
+      let node2
+      while ((node2 = walker2.nextNode())) {
+        superscriptPattern.lastIndex = 0
+        if (superscriptPattern.test(node2.textContent)) {
+          nodesToProcess.push(node2)
+        }
         superscriptPattern.lastIndex = 0
       }
 
@@ -184,10 +221,9 @@ const Hooks = {
 
         superscriptPattern.lastIndex = 0
         while ((match = superscriptPattern.exec(text)) !== null) {
-          const superscript = match[0]
-          const index = this.SUPERSCRIPTS[superscript]
-          // Source keys are strings from JSON (e.g., "index" not index)
-          const source = this.sources.find(s => (s.index || s["index"]) === index)
+          const originalIndex = this.SUPERSCRIPTS[match[0]]
+          const newIndex = renumberMap[originalIndex]
+          const source = this.renumberedSources[newIndex]
 
           // Add text before the match
           if (match.index > lastIndex) {
@@ -195,22 +231,22 @@ const Hooks = {
           }
 
           if (source) {
-            // Create clickable span for the citation
+            // Create clickable span with renumbered citation
             const span = document.createElement("span")
-            span.textContent = superscript
+            span.textContent = this.toSuperscript(newIndex)
             span.className = "citation-link cursor-pointer text-primary hover:underline font-semibold"
-            span.dataset.sourceIndex = index
+            span.dataset.sourceIndex = newIndex
             const filename = source.filename || source["filename"]
             span.title = `Click to view source: ${filename}`
             span.addEventListener("click", (e) => {
               e.preventDefault()
               e.stopPropagation()
-              this.showSource(source)
+              this.showSource(source, newIndex)
             })
             fragment.appendChild(span)
           } else {
-            // No source found, just add the text
-            fragment.appendChild(document.createTextNode(superscript))
+            // No source found, just add the original text
+            fragment.appendChild(document.createTextNode(match[0]))
           }
 
           lastIndex = match.index + match[0].length
@@ -226,14 +262,14 @@ const Hooks = {
       })
     },
 
-    showSource(source) {
+    showSource(source, displayIndex) {
       const modal = document.getElementById("citation-modal")
       const title = document.getElementById("citation-modal-title")
       const meta = document.getElementById("citation-modal-meta")
       const content = document.getElementById("citation-modal-content")
 
-      // Handle both atom and string keys (JSON uses strings)
-      const idx = source.index || source["index"]
+      // Use display index for the title (renumbered)
+      const idx = displayIndex || source.displayIndex || source.index || source["index"]
       const filename = source.filename || source["filename"]
       const section = source.section || source["section"]
       const sourceContent = source.content || source["content"]
