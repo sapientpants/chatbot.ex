@@ -16,6 +16,13 @@ defmodule Chatbot.Chat.Message do
           arguments: map()
         }
 
+  @type rag_source :: %{
+          index: integer(),
+          filename: String.t(),
+          section: String.t() | nil,
+          content: String.t()
+        }
+
   @type t :: %__MODULE__{
           id: binary() | nil,
           role: String.t() | nil,
@@ -28,6 +35,7 @@ defmodule Chatbot.Chat.Message do
           tool_result: map() | nil,
           tool_error: String.t() | nil,
           tool_duration_ms: integer() | nil,
+          rag_sources: [rag_source()] | nil,
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
         }
@@ -49,6 +57,9 @@ defmodule Chatbot.Chat.Message do
     field :tool_error, :string
     field :tool_duration_ms, :integer
 
+    # RAG citation sources
+    field :rag_sources, {:array, :map}, default: []
+
     belongs_to :conversation, Chatbot.Chat.Conversation, define_field: false
 
     timestamps(type: :utc_datetime)
@@ -68,7 +79,8 @@ defmodule Chatbot.Chat.Message do
       :tool_name,
       :tool_result,
       :tool_error,
-      :tool_duration_ms
+      :tool_duration_ms,
+      :rag_sources
     ])
     |> validate_required([:role, :conversation_id])
     |> validate_content_or_tool()

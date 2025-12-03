@@ -102,15 +102,43 @@ defmodule Chatbot.RAG.Pipeline do
   @spec retrieve_context(binary(), String.t(), keyword()) ::
           {:ok, String.t()} | {:error, term()}
   def retrieve_context(conversation_id, query, opts \\ []) do
+    case retrieve_context_with_sources(conversation_id, query, opts) do
+      {:ok, context, _sources} -> {:ok, context}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Retrieves context with source metadata for clickable citations.
+
+  Returns both the formatted context string and a list of source metadata
+  that can be stored with the message for rendering clickable footnotes.
+
+  ## Parameters
+
+  Same as `retrieve_context/3`.
+
+  ## Returns
+
+    * `{:ok, context, sources}` - Context string and source list
+    * `{:error, reason}` - If retrieval fails
+
+  Source format:
+      [%{index: 1, filename: "doc.md", section: "Auth", content: "..."}]
+  """
+  @spec retrieve_context_with_sources(binary(), String.t(), keyword()) ::
+          {:ok, String.t(), [map()]} | {:error, term()}
+  def retrieve_context_with_sources(conversation_id, query, opts \\ []) do
     token_budget = Keyword.get(opts, :token_budget, config(:token_budget, 2000))
 
     case retrieve(conversation_id, query, opts) do
       {:ok, []} ->
-        {:ok, ""}
+        {:ok, "", []}
 
       {:ok, chunks} ->
         context = format_context_with_citations(chunks, token_budget)
-        {:ok, context}
+        sources = chunks_to_sources(chunks)
+        {:ok, context, sources}
 
       {:error, reason} ->
         {:error, reason}
@@ -310,6 +338,19 @@ defmodule Chatbot.RAG.Pipeline do
       %{headers: [h | _rest]} when is_binary(h) -> h
       _no_section -> ""
     end
+  end
+
+  defp chunks_to_sources(chunks) do
+    chunks
+    |> Enum.with_index(1)
+    |> Enum.map(fn {chunk, index} ->
+      %{
+        "index" => index,
+        "filename" => get_filename(chunk),
+        "section" => get_section(chunk),
+        "content" => chunk.content
+      }
+    end)
   end
 
   defp config(key, default) do

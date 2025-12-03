@@ -13,6 +13,16 @@ defmodule ChatbotWeb.Live.Chat.MessageComponents do
 
   @spec chat_message(map()) :: Phoenix.LiveView.Rendered.t()
   def chat_message(assigns) do
+    rag_sources = Map.get(assigns.message, :rag_sources, []) || []
+    has_sources = rag_sources != [] and assigns.message.role == "assistant"
+
+    assigns =
+      assigns
+      |> assign(:rag_sources, rag_sources)
+      |> assign(:has_sources, has_sources)
+      |> assign(:rag_sources_json, if(has_sources, do: Jason.encode!(rag_sources), else: "[]"))
+      |> assign(:message_content_id, "message-content-#{assigns.message.id}")
+
     ~H"""
     <div class={["flex gap-4", @message.role == "user" && "flex-row-reverse"]}>
       <div class={[
@@ -27,13 +37,18 @@ defmodule ChatbotWeb.Live.Chat.MessageComponents do
         <% end %>
       </div>
       <div class={["flex-1 min-w-0", @message.role == "user" && "flex flex-col items-end"]}>
-        <div class={[
-          "rounded-2xl px-4 py-3",
-          @message.role == "user" &&
-            "inline-block max-w-[85%] bg-primary text-primary-content rounded-br-md",
-          @message.role != "user" &&
-            "inline-block max-w-[85%] bg-base-200 rounded-bl-md border border-base-300 shadow-sm"
-        ]}>
+        <div
+          id={@message_content_id}
+          class={[
+            "rounded-2xl px-4 py-3",
+            @message.role == "user" &&
+              "inline-block max-w-[85%] bg-primary text-primary-content rounded-br-md",
+            @message.role != "user" &&
+              "inline-block max-w-[85%] bg-base-200 rounded-bl-md border border-base-300 shadow-sm"
+          ]}
+          phx-hook={if @has_sources, do: "CitationHighlighter"}
+          data-rag-sources={@rag_sources_json}
+        >
           <.markdown content={@message.content} />
         </div>
         <div class="text-xs text-base-content/40 mt-1.5 px-1">

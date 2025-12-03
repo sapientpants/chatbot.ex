@@ -109,6 +109,152 @@ const Hooks = {
     }
   },
 
+  // Citation highlighter - makes superscript footnote references clickable
+  CitationHighlighter: {
+    // Superscript character mappings
+    SUPERSCRIPTS: {
+      "¹": 1, "²": 2, "³": 3, "⁴": 4, "⁵": 5, "⁶": 6, "⁷": 7, "⁸": 8, "⁹": 9,
+      "¹⁰": 10, "¹¹": 11, "¹²": 12, "¹³": 13, "¹⁴": 14, "¹⁵": 15,
+      "¹⁶": 16, "¹⁷": 17, "¹⁸": 18, "¹⁹": 19, "²⁰": 20
+    },
+
+    mounted() {
+      this.sources = JSON.parse(this.el.dataset.ragSources || "[]")
+      this.highlightCitations()
+      this.setupModal()
+    },
+
+    updated() {
+      this.sources = JSON.parse(this.el.dataset.ragSources || "[]")
+      this.highlightCitations()
+    },
+
+    setupModal() {
+      // Create modal if it doesn't exist
+      if (!document.getElementById("citation-modal")) {
+        const modal = document.createElement("dialog")
+        modal.id = "citation-modal"
+        modal.className = "modal"
+        modal.innerHTML = `
+          <div class="modal-box max-w-2xl">
+            <form method="dialog">
+              <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+            </form>
+            <h3 class="font-bold text-lg mb-2" id="citation-modal-title">Source</h3>
+            <div class="text-sm text-base-content/60 mb-3" id="citation-modal-meta"></div>
+            <div class="prose prose-sm max-w-full" id="citation-modal-content"></div>
+          </div>
+          <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+          </form>
+        `
+        document.body.appendChild(modal)
+      }
+    },
+
+    highlightCitations() {
+      if (this.sources.length === 0) return
+
+      // Create a regex that matches all superscript patterns (two-digit first, then single)
+      const superscriptPattern = /¹⁰|¹¹|¹²|¹³|¹⁴|¹⁵|¹⁶|¹⁷|¹⁸|¹⁹|²⁰|[¹²³⁴⁵⁶⁷⁸⁹]/g
+
+      // Walk through all text nodes
+      const walker = document.createTreeWalker(
+        this.el,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+      )
+
+      const nodesToProcess = []
+      let node
+      while ((node = walker.nextNode())) {
+        if (superscriptPattern.test(node.textContent)) {
+          nodesToProcess.push(node)
+        }
+        // Reset regex lastIndex for next test
+        superscriptPattern.lastIndex = 0
+      }
+
+      nodesToProcess.forEach(textNode => {
+        const text = textNode.textContent
+        const fragment = document.createDocumentFragment()
+        let lastIndex = 0
+        let match
+
+        superscriptPattern.lastIndex = 0
+        while ((match = superscriptPattern.exec(text)) !== null) {
+          const superscript = match[0]
+          const index = this.SUPERSCRIPTS[superscript]
+          // Source keys are strings from JSON (e.g., "index" not index)
+          const source = this.sources.find(s => (s.index || s["index"]) === index)
+
+          // Add text before the match
+          if (match.index > lastIndex) {
+            fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)))
+          }
+
+          if (source) {
+            // Create clickable span for the citation
+            const span = document.createElement("span")
+            span.textContent = superscript
+            span.className = "citation-link cursor-pointer text-primary hover:underline font-semibold"
+            span.dataset.sourceIndex = index
+            const filename = source.filename || source["filename"]
+            span.title = `Click to view source: ${filename}`
+            span.addEventListener("click", (e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              this.showSource(source)
+            })
+            fragment.appendChild(span)
+          } else {
+            // No source found, just add the text
+            fragment.appendChild(document.createTextNode(superscript))
+          }
+
+          lastIndex = match.index + match[0].length
+        }
+
+        // Add remaining text
+        if (lastIndex < text.length) {
+          fragment.appendChild(document.createTextNode(text.slice(lastIndex)))
+        }
+
+        // Replace the text node
+        textNode.parentNode.replaceChild(fragment, textNode)
+      })
+    },
+
+    showSource(source) {
+      const modal = document.getElementById("citation-modal")
+      const title = document.getElementById("citation-modal-title")
+      const meta = document.getElementById("citation-modal-meta")
+      const content = document.getElementById("citation-modal-content")
+
+      // Handle both atom and string keys (JSON uses strings)
+      const idx = source.index || source["index"]
+      const filename = source.filename || source["filename"]
+      const section = source.section || source["section"]
+      const sourceContent = source.content || source["content"]
+
+      title.textContent = `Source ${idx}: ${filename}`
+      meta.textContent = section ? `Section: ${section}` : ""
+
+      // Render content as plain text with line breaks
+      content.innerHTML = this.escapeHtml(sourceContent)
+        .replace(/\n/g, "<br>")
+
+      modal.showModal()
+    },
+
+    escapeHtml(text) {
+      const div = document.createElement("div")
+      div.textContent = text
+      return div.innerHTML
+    }
+  },
+
   // Scroll to bottom when new messages arrive and highlight code
   // Uses flex-col-reverse so scrollTop=0 shows the bottom (no flicker on load)
   ScrollToBottom: {

@@ -14,18 +14,25 @@ defmodule ChatbotWeb.Live.Chat.MessageHelpers do
 
   @doc """
   Saves an assistant message and updates conversation state.
+
+  Options:
+    * `:rag_sources` - List of RAG source metadata for clickable footnotes
   """
   @spec save_assistant_message(
           Phoenix.LiveView.Socket.t(),
           any(),
           String.t(),
-          (Phoenix.LiveView.Socket.t() -> Phoenix.LiveView.Socket.t())
+          (Phoenix.LiveView.Socket.t() -> Phoenix.LiveView.Socket.t()),
+          keyword()
         ) :: {:noreply, Phoenix.LiveView.Socket.t()}
-  def save_assistant_message(socket, conversation_id, message_content, reset_fn) do
+  def save_assistant_message(socket, conversation_id, message_content, reset_fn, opts \\ []) do
+    rag_sources = Keyword.get(opts, :rag_sources, [])
+
     case Chat.create_message(%{
            conversation_id: conversation_id,
            role: "assistant",
-           content: message_content
+           content: message_content,
+           rag_sources: rag_sources
          }) do
       {:ok, message} ->
         current_conv = socket.assigns.current_conversation

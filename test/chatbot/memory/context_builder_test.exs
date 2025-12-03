@@ -132,7 +132,7 @@ defmodule Chatbot.Memory.ContextBuilderTest do
     end
 
     test "returns OpenAI-formatted messages", %{user: user, conversation: conversation} do
-      {:ok, messages} = ContextBuilder.build_context(conversation.id, user.id)
+      {:ok, messages, _rag_sources} = ContextBuilder.build_context(conversation.id, user.id)
 
       assert is_list(messages)
       # Should have at least system prompt + conversation messages
@@ -148,7 +148,7 @@ defmodule Chatbot.Memory.ContextBuilderTest do
     test "respects custom system prompt", %{user: user, conversation: conversation} do
       custom_prompt = "You are a pirate assistant."
 
-      {:ok, messages} =
+      {:ok, messages, _rag_sources} =
         ContextBuilder.build_context(conversation.id, user.id, system_prompt: custom_prompt)
 
       system_message = hd(messages)
@@ -156,7 +156,7 @@ defmodule Chatbot.Memory.ContextBuilderTest do
     end
 
     test "includes conversation messages in order", %{user: user, conversation: conversation} do
-      {:ok, messages} = ContextBuilder.build_context(conversation.id, user.id)
+      {:ok, messages, _rag_sources} = ContextBuilder.build_context(conversation.id, user.id)
 
       # Filter to non-system messages
       conv_messages = Enum.filter(messages, &(&1.role != "system"))
@@ -169,7 +169,7 @@ defmodule Chatbot.Memory.ContextBuilderTest do
     test "handles empty conversation", %{user: user} do
       {:ok, empty_conv} = Chatbot.Chat.create_conversation(%{user_id: user.id, title: "Empty"})
 
-      {:ok, messages} = ContextBuilder.build_context(empty_conv.id, user.id)
+      {:ok, messages, _rag_sources} = ContextBuilder.build_context(empty_conv.id, user.id)
 
       # Should still have system prompt
       assert length(messages) >= 1
@@ -185,7 +185,7 @@ defmodule Chatbot.Memory.ContextBuilderTest do
         message_range_end: 10
       })
 
-      {:ok, messages} = ContextBuilder.build_context(conversation.id, user.id)
+      {:ok, messages, _rag_sources} = ContextBuilder.build_context(conversation.id, user.id)
 
       # Should have two system messages (prompt + summary)
       system_messages = Enum.filter(messages, &(&1.role == "system"))
@@ -319,7 +319,7 @@ defmodule Chatbot.Memory.ContextBuilderTest do
       stub(Chatbot.OllamaMock, :embed, fn _text -> {:ok, embedding} end)
       stub(Chatbot.OllamaMock, :embedding_dimension, fn -> 1024 end)
 
-      {:ok, messages} =
+      {:ok, messages, _rag_sources} =
         ContextBuilder.build_context(
           conversation.id,
           user.id,
@@ -340,7 +340,7 @@ defmodule Chatbot.Memory.ContextBuilderTest do
         })
       end
 
-      {:ok, messages} =
+      {:ok, messages, _rag_sources} =
         ContextBuilder.build_context(
           conversation.id,
           user.id,
@@ -426,7 +426,7 @@ defmodule Chatbot.Memory.ContextBuilderTest do
           size_bytes: 50
         })
 
-      {:ok, messages} = ContextBuilder.build_context(conversation.id, user.id)
+      {:ok, messages, _rag_sources} = ContextBuilder.build_context(conversation.id, user.id)
 
       system_prompt = hd(messages).content
       # With RAG disabled, attachment content is NOT included

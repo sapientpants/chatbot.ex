@@ -35,10 +35,13 @@ defmodule ChatbotWeb.Live.Chat.MessageProcessor do
         socket = maybe_update_title(socket, content)
         model = socket.assigns.selected_model || "default"
 
-        {:ok, openai_messages} =
+        {:ok, openai_messages, rag_sources} =
           ContextBuilder.build_context(conversation_id, user_id, current_query: content)
 
-        socket = maybe_update_model(socket, model)
+        socket =
+          socket
+          |> maybe_update_model(model)
+          |> assign(:rag_sources, rag_sources)
 
         if ToolRegistry.user_has_tools?(user_id) do
           start_agent_loop(socket, user_message, openai_messages, model, user_id)
@@ -57,11 +60,14 @@ defmodule ChatbotWeb.Live.Chat.MessageProcessor do
   @spec save_assistant_message(Phoenix.LiveView.Socket.t(), any(), String.t()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
   def save_assistant_message(socket, conversation_id, complete_message) do
+    rag_sources = socket.assigns[:rag_sources] || []
+
     MessageHelpers.save_assistant_message(
       socket,
       conversation_id,
       complete_message,
-      &reset_streaming_state/1
+      &reset_streaming_state/1,
+      rag_sources: rag_sources
     )
   end
 
