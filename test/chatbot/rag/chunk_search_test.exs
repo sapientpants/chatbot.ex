@@ -261,4 +261,133 @@ defmodule Chatbot.RAG.ChunkSearchTest do
       end
     end
   end
+
+  describe "search_multi/3" do
+    test "returns empty list when no chunks exist" do
+      conversation = conversation_fixture()
+      embedding = List.duplicate(0.1, 1024)
+      query_embeddings = [{"test query", embedding}]
+
+      {:ok, chunks} = ChunkSearch.search_multi(conversation.id, query_embeddings, limit: 10)
+
+      assert chunks == []
+    end
+
+    test "finds chunks across multiple query embeddings" do
+      attachment = attachment_fixture_without_chunks()
+      embedding = List.duplicate(0.1, 1024)
+
+      chunk =
+        attachment_chunk_fixture(
+          attachment: attachment,
+          embedding: embedding,
+          content: "Test content about Elixir"
+        )
+
+      query_embeddings = [
+        {"test query", embedding},
+        {"another query", embedding}
+      ]
+
+      {:ok, chunks} =
+        ChunkSearch.search_multi(
+          attachment.conversation_id,
+          query_embeddings,
+          limit: 10
+        )
+
+      assert length(chunks) >= 1
+      assert Enum.any?(chunks, &(&1.id == chunk.id))
+    end
+
+    test "deduplicates results from multiple queries" do
+      attachment = attachment_fixture_without_chunks()
+      embedding = List.duplicate(0.1, 1024)
+
+      attachment_chunk_fixture(
+        attachment: attachment,
+        embedding: embedding,
+        content: "Unique content"
+      )
+
+      # Same embedding for multiple queries should find same chunk
+      query_embeddings = [
+        {"query one", embedding},
+        {"query two", embedding},
+        {"query three", embedding}
+      ]
+
+      {:ok, chunks} =
+        ChunkSearch.search_multi(
+          attachment.conversation_id,
+          query_embeddings,
+          limit: 10
+        )
+
+      # Should return only one chunk despite multiple queries matching it
+      assert length(chunks) == 1
+    end
+  end
+
+  describe "semantic_search with attachment_ids filter" do
+    test "filters by specific attachment_ids" do
+      # Create a conversation, then two attachments in it
+      conversation = conversation_fixture()
+
+      attachment1 = attachment_fixture_without_chunks(conversation: conversation)
+      attachment2 = attachment_fixture_without_chunks(conversation: conversation)
+
+      embedding = List.duplicate(0.1, 1024)
+
+      chunk1 = attachment_chunk_fixture(attachment: attachment1, embedding: embedding)
+      _chunk2 = attachment_chunk_fixture(attachment: attachment2, embedding: embedding)
+
+      query_embedding = Pgvector.new(embedding)
+
+      results =
+        ChunkSearch.semantic_search(
+          conversation.id,
+          query_embedding,
+          limit: 10,
+          attachment_ids: [attachment1.id]
+        )
+
+      # Should only find chunk from filtered attachment
+      assert length(results) == 1
+      assert hd(results).id == chunk1.id
+    end
+  end
+
+  describe "keyword_search with attachment_ids filter" do
+    test "filters by specific attachment_ids" do
+      conversation = conversation_fixture()
+
+      attachment1 = attachment_fixture_without_chunks(conversation: conversation)
+      attachment2 = attachment_fixture_without_chunks(conversation: conversation)
+
+      chunk1 =
+        attachment_chunk_fixture(
+          attachment: attachment1,
+          content: "Elixir programming is awesome"
+        )
+
+      _chunk2 =
+        attachment_chunk_fixture(
+          attachment: attachment2,
+          content: "Elixir programming is great"
+        )
+
+      results =
+        ChunkSearch.keyword_search(
+          conversation.id,
+          "Elixir programming",
+          limit: 10,
+          attachment_ids: [attachment1.id]
+        )
+
+      # Should only find chunk from filtered attachment
+      assert length(results) == 1
+      assert hd(results).id == chunk1.id
+    end
+  end
 end
