@@ -45,6 +45,7 @@ defmodule Chatbot.Settings do
     "completion_provider" => "ollama",
     "embedding_provider" => "ollama",
     "default_model" => nil,
+    "preferred_chat_model" => nil,
     "ollama_url" => "http://localhost:11434",
     "ollama_embedding_model" => "qwen3-embedding:0.6b",
     "lmstudio_enabled" => "false",

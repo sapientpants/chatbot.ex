@@ -109,6 +109,11 @@ defmodule ChatbotWeb.ChatLive.Show do
   end
 
   @impl Phoenix.LiveView
+  def handle_event("stop_streaming", _params, socket) do
+    StreamingHelpers.handle_stop_streaming(socket)
+  end
+
+  @impl Phoenix.LiveView
   def handle_event("show_delete_modal", _params, socket) do
     {:noreply, assign(socket, :show_delete_modal, true)}
   end

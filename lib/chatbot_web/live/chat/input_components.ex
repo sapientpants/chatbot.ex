@@ -41,27 +41,28 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
               placeholder="Type your message..."
               rows="1"
               class="flex-1 bg-transparent border-none text-base resize-none min-h-[40px] max-h-[200px] py-2 px-3 focus:outline-none placeholder:text-base-content/40"
-              disabled={@is_streaming}
               aria-label="Message input"
               phx-hook="AutoGrowTextarea"
               id={@id}
             ></textarea>
-            <button
-              type="submit"
-              disabled={@is_streaming}
-              class={[
-                "btn btn-circle btn-sm flex-shrink-0 transition-all",
-                @is_streaming && "btn-ghost",
-                !@is_streaming && "btn-primary"
-              ]}
-              aria-label="Send message"
-            >
-              <%= if @is_streaming do %>
-                <span class="loading loading-spinner loading-sm"></span>
-              <% else %>
+            <%= if @is_streaming do %>
+              <button
+                type="button"
+                phx-click="stop_streaming"
+                class="btn btn-circle btn-sm flex-shrink-0 btn-error"
+                aria-label="Stop generating"
+              >
+                <.icon name="hero-stop" class="w-4 h-4" />
+              </button>
+            <% else %>
+              <button
+                type="submit"
+                class="btn btn-circle btn-sm flex-shrink-0 btn-primary"
+                aria-label="Send message"
+              >
                 <.icon name="hero-arrow-up" class="w-4 h-4" />
-              <% end %>
-            </button>
+              </button>
+            <% end %>
           </div>
           <p class="text-xs text-center text-base-content/40 mt-2">
             Press Enter to send, Shift+Enter for new line
@@ -333,19 +334,28 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
               placeholder="Type your message..."
               rows="3"
               class="textarea textarea-bordered w-full text-base resize-none pl-14 pr-14 focus:textarea-primary focus:outline-none"
-              disabled={@is_streaming}
               aria-label="Message input"
               id="empty-state-input"
               phx-hook="AutoGrowTextarea"
             ></textarea>
-            <button
-              type="submit"
-              disabled={@is_streaming}
-              class="absolute right-3 bottom-3 btn btn-primary btn-sm btn-circle"
-              aria-label="Send message"
-            >
-              <.icon name="hero-arrow-up" class="w-4 h-4" />
-            </button>
+            <%= if @is_streaming do %>
+              <button
+                type="button"
+                phx-click="stop_streaming"
+                class="absolute right-3 bottom-3 btn btn-error btn-sm btn-circle"
+                aria-label="Stop generating"
+              >
+                <.icon name="hero-stop" class="w-4 h-4" />
+              </button>
+            <% else %>
+              <button
+                type="submit"
+                class="absolute right-3 bottom-3 btn btn-primary btn-sm btn-circle"
+                aria-label="Send message"
+              >
+                <.icon name="hero-arrow-up" class="w-4 h-4" />
+              </button>
+            <% end %>
           </div>
         </.form>
       </div>

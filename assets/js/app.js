@@ -97,11 +97,13 @@ const Hooks = {
       this.el.style.height = Math.min(this.el.scrollHeight, this.MAX_HEIGHT) + "px"
     },
     handleKeydown(e) {
-      // Enter without Shift submits the form
+      // Enter without Shift submits the form (unless streaming)
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault()
         const form = this.el.closest("form")
-        if (form && this.el.value.trim()) {
+        // Check if stop button exists (means we're streaming)
+        const isStreaming = form && form.querySelector('[phx-click="stop_streaming"]')
+        if (form && this.el.value.trim() && !isStreaming) {
           // Use requestSubmit() to properly trigger LiveView's phx-submit
           form.requestSubmit()
         }

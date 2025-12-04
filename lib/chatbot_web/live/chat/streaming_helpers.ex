@@ -35,6 +35,7 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   @doc """
   Handles loading available models from LM Studio.
   Uses the ModelCache to avoid repeated API calls.
+  Falls back to saved preference or first available model.
   """
   @spec handle_load_models(Phoenix.LiveView.Socket.t()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
@@ -45,7 +46,17 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
 
         socket =
           if is_nil(socket.assigns.selected_model) and model_list != [] do
-            assign(socket, :selected_model, List.first(model_list))
+            # Try to use saved preference, fall back to first available
+            preferred = Chatbot.Settings.get("preferred_chat_model")
+
+            model =
+              if preferred && preferred in model_list do
+                preferred
+              else
+                List.first(model_list)
+              end
+
+            assign(socket, :selected_model, model)
           else
             socket
           end
@@ -149,10 +160,19 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
 
   @doc """
   Handles model selection change.
+  Persists the model preference to settings for future sessions.
   """
   @spec handle_select_model(String.t(), Phoenix.LiveView.Socket.t()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_select_model(model_id, socket) do
+    # Persist preference for future sessions
+    Chatbot.Settings.set("preferred_chat_model", model_id)
+
+    # Update conversation if one exists
+    if conversation = socket.assigns[:current_conversation] do
+      Chat.update_conversation(conversation, %{model_name: model_id})
+    end
+
     {:noreply, assign(socket, :selected_model, model_id)}
   end
 
@@ -198,6 +218,26 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Failed to create conversation")}
     end
+  end
+
+  @doc """
+  Handles stopping/cancelling the current streaming response.
+  """
+  @spec handle_stop_streaming(Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_stop_streaming(socket) do
+    task_pid = socket.assigns[:streaming_task_pid]
+
+    if task_pid && Process.alive?(task_pid) do
+      Process.exit(task_pid, :kill)
+    end
+
+    maybe_unregister_streaming_task(socket)
+
+    {:noreply,
+     socket
+     |> assign(:streaming_task_pid, nil)
+     |> reset_streaming_state()}
   end
 
   @doc """

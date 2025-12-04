@@ -123,6 +123,11 @@ defmodule ChatbotWeb.ChatLive.Index do
   end
 
   @impl Phoenix.LiveView
+  def handle_event("stop_streaming", _params, socket) do
+    StreamingHelpers.handle_stop_streaming(socket)
+  end
+
+  @impl Phoenix.LiveView
   def handle_event("toggle_sidebar", _params, socket) do
     {:noreply, assign(socket, :sidebar_open, !socket.assigns.sidebar_open)}
   end

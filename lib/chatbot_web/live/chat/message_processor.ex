@@ -30,24 +30,25 @@ defmodule ChatbotWeb.Live.Chat.MessageProcessor do
     conversation_id = socket.assigns.current_conversation.id
     user_id = socket.assigns.current_user.id
 
-    # Update processing status
-    socket = assign(socket, :processing_status, "Saving your message...")
-
     case Chat.create_message(%{conversation_id: conversation_id, role: "user", content: content}) do
       {:ok, user_message} ->
-        socket = maybe_update_title(socket, content)
-        model = socket.assigns.selected_model || "default"
+        # Immediately show user message and bouncing dots
+        socket =
+          socket
+          |> maybe_update_title(content)
+          |> stream_insert(:messages, user_message, at: -1)
+          |> assign(:has_messages, true)
+          |> assign(:is_streaming, true)
+          |> assign(:is_processing, false)
+          |> assign(:form, to_form(%{"content" => ""}, as: :message))
 
-        # Update status for context building (includes RAG retrieval)
-        socket = assign(socket, :processing_status, "Retrieving relevant context...")
+        model = socket.assigns.selected_model || "default"
 
         {:ok, openai_messages, rag_sources} =
           ContextBuilder.build_context(conversation_id, user_id, current_query: content)
 
-        # Update status for generating response
         socket =
           socket
-          |> assign(:processing_status, "Generating response...")
           |> maybe_update_model(model)
           |> assign(:rag_sources, rag_sources)
 
@@ -94,15 +95,9 @@ defmodule ChatbotWeb.Live.Chat.MessageProcessor do
 
     socket_updater = fn socket, task_pid ->
       socket
-      |> stream_insert(:messages, user_message, at: -1)
-      |> assign(:has_messages, true)
       |> assign(:streaming_chunks, [])
       |> assign(:streaming_task_pid, task_pid)
-      |> assign(:is_streaming, true)
-      |> assign(:is_processing, false)
-      |> assign(:processing_status, nil)
       |> assign(:last_user_message, user_message.content)
-      |> assign(:form, to_form(%{"content" => ""}, as: :message))
     end
 
     start_supervised_task(socket, user_message, user_id, liveview_pid, task_fn, socket_updater)
@@ -127,17 +122,11 @@ defmodule ChatbotWeb.Live.Chat.MessageProcessor do
 
     socket_updater = fn socket, task_pid ->
       socket
-      |> stream_insert(:messages, user_message, at: -1)
-      |> assign(:has_messages, true)
       |> assign(:streaming_task_pid, task_pid)
-      |> assign(:is_streaming, true)
-      |> assign(:is_processing, false)
-      |> assign(:processing_status, nil)
       |> assign(:agent_mode, true)
       |> assign(:pending_tool_calls, [])
       |> assign(:tool_results, [])
       |> assign(:last_user_message, user_message.content)
-      |> assign(:form, to_form(%{"content" => ""}, as: :message))
     end
 
     start_supervised_task(socket, user_message, user_id, liveview_pid, task_fn, socket_updater)
