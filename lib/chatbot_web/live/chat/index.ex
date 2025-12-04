@@ -63,9 +63,8 @@ defmodule ChatbotWeb.ChatLive.Index do
       |> assign(:models_loading, true)
       |> assign(:streaming_task_pid, nil)
       |> assign(:sidebar_open, false)
-      |> assign(:attachments_expanded, false)
-      |> assign(:pending_saves, [])
       |> assign(:form, to_form(%{"content" => ""}, as: :message))
+      |> UploadHelpers.init_upload_assigns()
       |> UploadHelpers.configure_uploads()
       |> UploadHelpers.load_attachments()
 

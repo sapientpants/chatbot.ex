@@ -9,6 +9,22 @@ defmodule ChatbotWeb.Live.Chat.UploadHelpers do
   alias Chatbot.Chat
   alias Chatbot.Chat.ConversationAttachment
 
+  # Maximum concurrent database saves to prevent overwhelming the server
+  @max_concurrent_saves 5
+
+  @doc """
+  Initializes all upload-related assigns on a socket.
+  Call this in mount to set up pending_saves, saves_in_flight, save_queue, and attachments_expanded.
+  """
+  @spec init_upload_assigns(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
+  def init_upload_assigns(socket) do
+    socket
+    |> assign(:attachments_expanded, false)
+    |> assign(:pending_saves, [])
+    |> assign(:saves_in_flight, 0)
+    |> assign(:save_queue, [])
+  end
+
   @doc """
   Configures file upload for markdown files on a socket.
   """
@@ -65,39 +81,62 @@ defmodule ChatbotWeb.Live.Chat.UploadHelpers do
 
     pending_saves = [pending_save | socket.assigns[:pending_saves] || []]
 
-    # Consume the entry synchronously (required by Phoenix) but spawn DB save
-    consume_uploaded_entry(socket, entry, fn %{path: path} ->
-      process_uploaded_file(path, entry, conversation_id, liveview_pid)
-    end)
+    # Consume the entry and read content immediately (before temp file is deleted)
+    # consume_uploaded_entry callback MUST return {:ok, value} - wrap errors
+    # sobelow_skip ["Traversal.FileModule"]
+    save_result =
+      consume_uploaded_entry(socket, entry, fn %{path: path} ->
+        case File.read(path) do
+          {:ok, content} ->
+            {:ok,
+             {:ok,
+              %{
+                attrs: %{
+                  conversation_id: conversation_id,
+                  filename: entry.client_name,
+                  content: content,
+                  content_type: entry.client_type || "text/markdown",
+                  size_bytes: entry.client_size
+                },
+                ref: entry.ref,
+                filename: entry.client_name
+              }}}
 
-    assign(socket, :pending_saves, pending_saves)
-  end
+          {:error, _reason} ->
+            {:ok, {:error, entry.client_name}}
+        end
+      end)
 
-  # sobelow_skip ["Traversal.FileModule"]
-  # Path is provided by Phoenix's upload handling - safe temporary file path
-  defp process_uploaded_file(path, entry, conversation_id, liveview_pid) do
-    case File.read(path) do
-      {:ok, content} ->
-        spawn_attachment_save(content, entry, conversation_id, liveview_pid)
-        {:ok, :spawned}
+    socket = assign(socket, :pending_saves, pending_saves)
 
-      {:error, _reason} ->
-        send(liveview_pid, {:attachment_saved, {:error, entry.client_name}, entry.ref})
-        {:ok, :error}
+    # Either spawn immediately or queue based on current load
+    case save_result do
+      {:ok, item} ->
+        maybe_spawn_or_queue(socket, item, liveview_pid)
+
+      {:error, filename} ->
+        send(liveview_pid, {:attachment_saved, {:error, filename}, entry.ref})
+        socket
     end
   end
 
-  defp spawn_attachment_save(content, entry, conversation_id, liveview_pid) do
-    attrs = %{
-      conversation_id: conversation_id,
-      filename: entry.client_name,
-      content: content,
-      content_type: entry.client_type || "text/markdown",
-      size_bytes: entry.client_size
-    }
+  defp maybe_spawn_or_queue(socket, item, liveview_pid) do
+    saves_in_flight = socket.assigns[:saves_in_flight] || 0
+    save_queue = socket.assigns[:save_queue] || []
 
-    ref = entry.ref
-    filename = entry.client_name
+    if saves_in_flight < @max_concurrent_saves do
+      # Spawn immediately
+      spawn_attachment_save(item, liveview_pid)
+      assign(socket, :saves_in_flight, saves_in_flight + 1)
+    else
+      # Queue for later - order matters so we reverse at the end
+      # credo:disable-for-next-line Credo.Check.Refactor.AppendSingleItem
+      assign(socket, :save_queue, save_queue ++ [item])
+    end
+  end
+
+  defp spawn_attachment_save(item, liveview_pid) do
+    %{attrs: attrs, ref: ref, filename: filename} = item
 
     Task.Supervisor.start_child(Chatbot.TaskSupervisor, fn ->
       result =
@@ -134,20 +173,46 @@ defmodule ChatbotWeb.Live.Chat.UploadHelpers do
     # credo:disable-for-next-line Credo.Check.Refactor.AppendSingleItem
     updated_attachments = socket.assigns.attachments ++ [attachment]
 
-    {:noreply,
-     socket
-     |> assign(:attachments, updated_attachments)
-     |> assign(:pending_saves, pending_saves)}
+    socket =
+      socket
+      |> assign(:attachments, updated_attachments)
+      |> assign(:pending_saves, pending_saves)
+      |> process_save_queue()
+
+    {:noreply, socket}
   end
 
   def handle_attachment_saved({:error, filename}, ref, socket) do
     # Remove from pending saves even on error
     pending_saves = Enum.reject(socket.assigns[:pending_saves] || [], &(&1.ref == ref))
 
-    {:noreply,
-     socket
-     |> assign(:pending_saves, pending_saves)
-     |> put_flash(:error, "Failed to save #{filename}")}
+    socket =
+      socket
+      |> assign(:pending_saves, pending_saves)
+      |> put_flash(:error, "Failed to save #{filename}")
+      |> process_save_queue()
+
+    {:noreply, socket}
+  end
+
+  # Process the next item from the queue when a save completes
+  defp process_save_queue(socket) do
+    saves_in_flight = max((socket.assigns[:saves_in_flight] || 1) - 1, 0)
+    save_queue = socket.assigns[:save_queue] || []
+
+    case save_queue do
+      [next_item | rest] ->
+        # Spawn next item and keep saves_in_flight the same (one finished, one started)
+        spawn_attachment_save(next_item, self())
+
+        socket
+        |> assign(:saves_in_flight, saves_in_flight + 1)
+        |> assign(:save_queue, rest)
+
+      [] ->
+        # Nothing queued, just decrement counter
+        assign(socket, :saves_in_flight, saves_in_flight)
+    end
   end
 
   @doc """
