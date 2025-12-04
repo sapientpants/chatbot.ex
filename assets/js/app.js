@@ -97,13 +97,15 @@ const Hooks = {
       this.el.style.height = Math.min(this.el.scrollHeight, this.MAX_HEIGHT) + "px"
     },
     handleKeydown(e) {
-      // Enter without Shift submits the form (unless streaming)
+      // Enter without Shift submits the form (unless streaming or processing files)
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault()
         const form = this.el.closest("form")
         // Check if stop button exists (means we're streaming)
         const isStreaming = form && form.querySelector('[phx-click="stop_streaming"]')
-        if (form && this.el.value.trim() && !isStreaming) {
+        // Check if files are being uploaded/processed
+        const isProcessingFiles = this.el.dataset.processingFiles === "true"
+        if (form && this.el.value.trim() && !isStreaming && !isProcessingFiles) {
           // Use requestSubmit() to properly trigger LiveView's phx-submit
           form.requestSubmit()
         }

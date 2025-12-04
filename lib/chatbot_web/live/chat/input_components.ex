@@ -16,16 +16,20 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
   attr :id, :string, default: "message-input"
   attr :uploads, :any, default: nil
   attr :attachments, :list, default: []
+  attr :pending_saves, :list, default: []
   attr :attachments_expanded, :boolean, default: true
 
   @spec message_input_form(map()) :: Phoenix.LiveView.Rendered.t()
   def message_input_form(assigns) do
+    assigns = assign(assigns, :is_processing_files, processing_files?(assigns))
+
     ~H"""
     <div class="border-t border-base-300 bg-base-100 p-4">
       <div class="max-w-3xl mx-auto">
         <.attachment_panel
           attachments={@attachments}
           uploads={@uploads}
+          pending_saves={@pending_saves}
           expanded={@attachments_expanded}
         />
         <.form
@@ -44,6 +48,7 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
               aria-label="Message input"
               phx-hook="AutoGrowTextarea"
               id={@id}
+              data-processing-files={@is_processing_files}
             ></textarea>
             <%= if @is_streaming do %>
               <button
@@ -57,7 +62,12 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
             <% else %>
               <button
                 type="submit"
-                class="btn btn-circle btn-sm flex-shrink-0 btn-primary"
+                class={[
+                  "btn btn-circle btn-sm flex-shrink-0",
+                  @is_processing_files && "btn-disabled",
+                  not @is_processing_files && "btn-primary"
+                ]}
+                disabled={@is_processing_files}
                 aria-label="Send message"
               >
                 <.icon name="hero-arrow-up" class="w-4 h-4" />
@@ -109,31 +119,20 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
 
   attr :attachments, :list, required: true
   attr :uploads, :any, required: true
+  attr :pending_saves, :list, default: []
   attr :expanded, :boolean, default: true
 
   defp attachment_panel(assigns) do
-    attachment_count = length(assigns.attachments)
-
-    # Only count entries that aren't done (done entries are being consumed)
-    pending_entries =
-      if assigns.uploads,
-        do: Enum.reject(assigns.uploads.markdown_files.entries, & &1.done?),
-        else: []
-
-    pending_count = length(pending_entries)
-    total_count = attachment_count + pending_count
-    has_pending = pending_count > 0
-    # Don't collapse while uploads are in progress to avoid flickering
+    upload_count = active_upload_count(assigns.uploads)
+    total_count = length(assigns.attachments) + length(assigns.pending_saves) + upload_count
+    has_pending = upload_count > 0 || assigns.pending_saves != []
     should_collapse = total_count > @collapse_threshold and not has_pending
-
-    total_size = Enum.sum(Enum.map(assigns.attachments, & &1.size_bytes))
 
     assigns =
       assigns
       |> assign(:total_count, total_count)
       |> assign(:should_collapse, should_collapse)
-      |> assign(:total_size, total_size)
-      |> assign(:has_pending, has_pending)
+      |> assign(:total_size, Enum.sum(Enum.map(assigns.attachments, & &1.size_bytes)))
 
     ~H"""
     <%= if @total_count > 0 do %>
@@ -147,6 +146,7 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
           <.attachment_grid
             attachments={@attachments}
             uploads={@uploads}
+            pending_saves={@pending_saves}
             collapsible={@should_collapse}
             compact={@should_collapse}
           />
@@ -180,6 +180,7 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
 
   attr :attachments, :list, required: true
   attr :uploads, :any, required: true
+  attr :pending_saves, :list, default: []
   attr :collapsible, :boolean, default: false
   attr :compact, :boolean, default: false
 
@@ -204,8 +205,19 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
           />
         <% end %>
 
+        <%!-- Show pending saves (being saved to DB) with spinner --%>
+        <%= for pending <- @pending_saves do %>
+          <.attachment_chip
+            id={pending.ref}
+            filename={pending.filename}
+            size={pending.size}
+            type={:saving}
+            compact={@compact}
+          />
+        <% end %>
+
         <%= if @uploads do %>
-          <%!-- Only show entries that aren't done yet - done entries are being consumed and will appear in attachments --%>
+          <%!-- Show upload entries that aren't done yet --%>
           <%= for entry <- @uploads.markdown_files.entries, not entry.done? do %>
             <.attachment_chip
               id={entry.ref}
@@ -232,51 +244,51 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
   attr :compact, :boolean, default: false
 
   defp attachment_chip(assigns) do
-    size_display = format_file_size(assigns.size)
-
-    # For pending uploads, use gradient background to show progress
     bg_style =
-      if assigns.type == :pending and assigns.progress < 100 do
-        "background: linear-gradient(to right, oklch(var(--p) / 0.3) #{assigns.progress}%, oklch(var(--p) / 0.1) #{assigns.progress}%)"
-      else
-        nil
-      end
+      if assigns.type == :pending and assigns.progress < 100,
+        do:
+          "background: linear-gradient(to right, oklch(var(--p) / 0.3) #{assigns.progress}%, oklch(var(--p) / 0.1) #{assigns.progress}%)"
 
     assigns =
       assigns
-      |> assign(:size_display, size_display)
+      |> assign(:size_display, format_file_size(assigns.size))
       |> assign(:bg_style, bg_style)
+      |> assign(:is_loading, assigns.type in [:pending, :saving])
 
     ~H"""
     <div
       class={[
         "flex items-center gap-1.5 rounded-md text-xs px-2 py-1",
         @type == :saved && "bg-base-300",
-        @type == :pending && @progress >= 100 && "bg-primary/20",
+        @type in [:saving, :pending] && @progress >= 100 && "bg-primary/20",
         @type == :pending && @progress < 100 && "border border-primary/30"
       ]}
       style={@bg_style}
     >
-      <.icon name="hero-document-text" class="w-3 h-3 text-primary flex-shrink-0" />
+      <%= if @is_loading do %>
+        <span class="loading loading-spinner loading-xs text-primary flex-shrink-0"></span>
+      <% else %>
+        <.icon name="hero-document-text" class="w-3 h-3 text-primary flex-shrink-0" />
+      <% end %>
       <span class="truncate max-w-[150px]" title={@filename}>{@filename}</span>
       <%= if not @compact do %>
         <span class="text-base-content/50 flex-shrink-0">({@size_display})</span>
       <% end %>
-
       <%= for error <- @errors do %>
         <span class="text-error flex-shrink-0">{error_to_string(error)}</span>
       <% end %>
-
-      <button
-        type="button"
-        phx-click={if @type == :saved, do: "remove_attachment", else: "cancel_upload"}
-        phx-value-id={if @type == :saved, do: @id, else: nil}
-        phx-value-ref={if @type == :pending, do: @id, else: nil}
-        class="btn btn-circle btn-ghost btn-xs flex-shrink-0 -mr-1"
-        aria-label="Remove attachment"
-      >
-        <.icon name="hero-x-mark" class="w-3 h-3" />
-      </button>
+      <%= if @type in [:saved, :pending] do %>
+        <button
+          type="button"
+          phx-click={if @type == :saved, do: "remove_attachment", else: "cancel_upload"}
+          phx-value-id={if @type == :saved, do: @id, else: nil}
+          phx-value-ref={if @type == :pending, do: @id, else: nil}
+          class="btn btn-circle btn-ghost btn-xs flex-shrink-0 -mr-1"
+          aria-label="Remove attachment"
+        >
+          <.icon name="hero-x-mark" class="w-3 h-3" />
+        </button>
+      <% end %>
     </div>
     """
   end
@@ -290,6 +302,15 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
   defp error_to_string(:not_accepted), do: "Invalid file type"
   defp error_to_string(_error), do: "Upload error"
 
+  defp processing_files?(assigns) do
+    active_upload_count(assigns.uploads) > 0 || assigns.pending_saves != []
+  end
+
+  defp active_upload_count(nil), do: 0
+
+  defp active_upload_count(uploads),
+    do: Enum.count(uploads.markdown_files.entries, &(not &1.done?))
+
   @doc """
   Renders the empty chat state with welcome message.
   """
@@ -297,10 +318,13 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
   attr :is_streaming, :boolean, required: true
   attr :uploads, :any, default: nil
   attr :attachments, :list, default: []
+  attr :pending_saves, :list, default: []
   attr :attachments_expanded, :boolean, default: true
 
   @spec empty_chat_state(map()) :: Phoenix.LiveView.Rendered.t()
   def empty_chat_state(assigns) do
+    assigns = assign(assigns, :is_processing_files, processing_files?(assigns))
+
     ~H"""
     <div class="flex-1 flex flex-col items-center justify-center p-6">
       <div class="text-center mb-8 max-w-md">
@@ -317,6 +341,7 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
         <.attachment_panel
           attachments={@attachments}
           uploads={@uploads}
+          pending_saves={@pending_saves}
           expanded={@attachments_expanded}
         />
         <.form
@@ -337,6 +362,7 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
               aria-label="Message input"
               id="empty-state-input"
               phx-hook="AutoGrowTextarea"
+              data-processing-files={@is_processing_files}
             ></textarea>
             <%= if @is_streaming do %>
               <button
@@ -350,7 +376,12 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
             <% else %>
               <button
                 type="submit"
-                class="absolute right-3 bottom-3 btn btn-primary btn-sm btn-circle"
+                class={[
+                  "absolute right-3 bottom-3 btn btn-sm btn-circle",
+                  @is_processing_files && "btn-disabled",
+                  not @is_processing_files && "btn-primary"
+                ]}
+                disabled={@is_processing_files}
                 aria-label="Send message"
               >
                 <.icon name="hero-arrow-up" class="w-4 h-4" />

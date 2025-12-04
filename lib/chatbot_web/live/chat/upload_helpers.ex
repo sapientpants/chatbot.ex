@@ -25,6 +25,7 @@ defmodule ChatbotWeb.Live.Chat.UploadHelpers do
 
   @doc """
   Handles upload progress. When an entry completes (100%), saves it to the database.
+  Database saves are spawned asynchronously for parallel processing.
   """
   @spec handle_progress(
           :markdown_files,
@@ -34,11 +35,11 @@ defmodule ChatbotWeb.Live.Chat.UploadHelpers do
           {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_progress(:markdown_files, entry, socket) do
     if entry.done? do
-      # Upload complete, save to database
+      # Upload complete, save to database asynchronously
       conversation = socket.assigns[:current_conversation]
 
       if conversation && conversation.id do
-        socket = save_completed_upload(socket, entry, conversation.id)
+        socket = save_completed_upload_async(socket, entry, conversation.id)
         {:noreply, socket}
       else
         {:noreply, socket}
@@ -50,45 +51,93 @@ defmodule ChatbotWeb.Live.Chat.UploadHelpers do
 
   # sobelow_skip ["Traversal.FileModule"]
   # Path is provided by Phoenix's upload handling - safe temporary file path
-  defp save_completed_upload(socket, entry, conversation_id) do
-    result =
-      consume_uploaded_entry(socket, entry, fn %{path: path} ->
-        case File.read(path) do
-          {:ok, content} ->
-            attrs = %{
-              conversation_id: conversation_id,
-              filename: entry.client_name,
-              content: content,
-              content_type: entry.client_type || "text/markdown",
-              size_bytes: entry.client_size
-            }
+  defp save_completed_upload_async(socket, entry, conversation_id) do
+    liveview_pid = self()
 
-            case Chat.create_attachment(attrs) do
-              {:ok, attachment} ->
-                {:ok, {:ok, attachment}}
+    # Track pending save for UI display
+    pending_save = %{
+      ref: entry.ref,
+      filename: entry.client_name,
+      size: entry.client_size
+    }
 
-              {:error, _changeset} ->
-                {:ok, {:error, entry.client_name}}
-            end
+    pending_saves = [pending_save | socket.assigns[:pending_saves] || []]
 
-          {:error, _reason} ->
-            {:ok, {:error, entry.client_name}}
-        end
-      end)
+    # Consume the entry synchronously (required by Phoenix) but spawn DB save
+    consume_uploaded_entry(socket, entry, fn %{path: path} ->
+      process_uploaded_file(path, entry, conversation_id, liveview_pid)
+    end)
 
-    handle_save_result(result, socket, entry.client_name)
+    assign(socket, :pending_saves, pending_saves)
   end
 
-  defp handle_save_result({:ok, attachment}, socket, _filename) do
-    # Append to maintain chronological order (newest last)
-    # Performance is acceptable for max 1000 attachments added one at a time
+  # sobelow_skip ["Traversal.FileModule"]
+  # Path is provided by Phoenix's upload handling - safe temporary file path
+  defp process_uploaded_file(path, entry, conversation_id, liveview_pid) do
+    case File.read(path) do
+      {:ok, content} ->
+        spawn_attachment_save(content, entry, conversation_id, liveview_pid)
+        {:ok, :spawned}
+
+      {:error, _reason} ->
+        send(liveview_pid, {:attachment_saved, {:error, entry.client_name}})
+        {:ok, :error}
+    end
+  end
+
+  defp spawn_attachment_save(content, entry, conversation_id, liveview_pid) do
+    attrs = %{
+      conversation_id: conversation_id,
+      filename: entry.client_name,
+      content: content,
+      content_type: entry.client_type || "text/markdown",
+      size_bytes: entry.client_size
+    }
+
+    ref = entry.ref
+
+    Task.Supervisor.start_child(Chatbot.TaskSupervisor, fn ->
+      result = save_attachment_to_db(attrs, entry.client_name)
+      send(liveview_pid, {:attachment_saved, result, ref})
+    end)
+  end
+
+  defp save_attachment_to_db(attrs, filename) do
+    case Chat.create_attachment(attrs) do
+      {:ok, attachment} -> {:ok, attachment}
+      {:error, _changeset} -> {:error, filename}
+    end
+  end
+
+  @doc """
+  Handles the result of an async attachment save.
+  Call this from your LiveView's handle_info for {:attachment_saved, result, ref}.
+  """
+  @spec handle_attachment_saved(
+          {:ok, ConversationAttachment.t()} | {:error, String.t()},
+          String.t(),
+          Phoenix.LiveView.Socket.t()
+        ) :: {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_attachment_saved({:ok, attachment}, ref, socket) do
+    # Remove from pending saves and add to attachments
+    pending_saves = Enum.reject(socket.assigns[:pending_saves] || [], &(&1.ref == ref))
     # credo:disable-for-next-line Credo.Check.Refactor.AppendSingleItem
     updated_attachments = socket.assigns.attachments ++ [attachment]
-    assign(socket, :attachments, updated_attachments)
+
+    {:noreply,
+     socket
+     |> assign(:attachments, updated_attachments)
+     |> assign(:pending_saves, pending_saves)}
   end
 
-  defp handle_save_result({:error, _filename}, socket, filename) do
-    put_flash(socket, :error, "Failed to save #{filename}")
+  def handle_attachment_saved({:error, filename}, ref, socket) do
+    # Remove from pending saves even on error
+    pending_saves = Enum.reject(socket.assigns[:pending_saves] || [], &(&1.ref == ref))
+
+    {:noreply,
+     socket
+     |> assign(:pending_saves, pending_saves)
+     |> put_flash(:error, "Failed to save #{filename}")}
   end
 
   @doc """

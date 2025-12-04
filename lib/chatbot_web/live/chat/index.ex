@@ -64,6 +64,7 @@ defmodule ChatbotWeb.ChatLive.Index do
       |> assign(:streaming_task_pid, nil)
       |> assign(:sidebar_open, false)
       |> assign(:attachments_expanded, false)
+      |> assign(:pending_saves, [])
       |> assign(:form, to_form(%{"content" => ""}, as: :message))
       |> UploadHelpers.configure_uploads()
       |> UploadHelpers.load_attachments()
@@ -105,6 +106,11 @@ defmodule ChatbotWeb.ChatLive.Index do
   @impl Phoenix.LiveView
   def handle_info({:DOWN, _ref, :process, _task_pid, reason}, socket) do
     StreamingHelpers.handle_task_down(reason, socket)
+  end
+
+  @impl Phoenix.LiveView
+  def handle_info({:attachment_saved, result, ref}, socket) do
+    UploadHelpers.handle_attachment_saved(result, ref, socket)
   end
 
   @impl Phoenix.LiveView
@@ -201,6 +207,7 @@ defmodule ChatbotWeb.ChatLive.Index do
             is_streaming={@is_streaming}
             uploads={@uploads}
             attachments={@attachments}
+            pending_saves={@pending_saves}
             attachments_expanded={@attachments_expanded}
           />
         <% else %>
@@ -216,6 +223,7 @@ defmodule ChatbotWeb.ChatLive.Index do
             is_streaming={@is_streaming}
             uploads={@uploads}
             attachments={@attachments}
+            pending_saves={@pending_saves}
             attachments_expanded={@attachments_expanded}
           />
         <% end %>
