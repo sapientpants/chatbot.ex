@@ -113,9 +113,13 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
   defp attachment_panel(assigns) do
     attachment_count = length(assigns.attachments)
 
-    pending_count =
-      if assigns.uploads, do: length(assigns.uploads.markdown_files.entries), else: 0
+    # Only count entries that aren't done (done entries are being consumed)
+    pending_entries =
+      if assigns.uploads,
+        do: Enum.reject(assigns.uploads.markdown_files.entries, & &1.done?),
+        else: []
 
+    pending_count = length(pending_entries)
     total_count = attachment_count + pending_count
     has_pending = pending_count > 0
     # Don't collapse while uploads are in progress to avoid flickering
@@ -200,7 +204,8 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
         <% end %>
 
         <%= if @uploads do %>
-          <%= for entry <- @uploads.markdown_files.entries do %>
+          <%!-- Only show entries that aren't done yet - done entries are being consumed and will appear in attachments --%>
+          <%= for entry <- @uploads.markdown_files.entries, not entry.done? do %>
             <.attachment_chip
               id={entry.ref}
               filename={entry.client_name}
