@@ -260,7 +260,8 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
       class={[
         "flex items-center gap-1.5 rounded-md text-xs px-2 py-1",
         @type == :saved && "bg-base-300",
-        @type in [:saving, :pending] && @progress >= 100 && "bg-primary/20",
+        @type == :saving && "bg-primary/20 border border-primary/30",
+        @type == :pending && @progress >= 100 && "bg-primary/20",
         @type == :pending && @progress < 100 && "border border-primary/30"
       ]}
       style={@bg_style}

@@ -80,7 +80,7 @@ defmodule ChatbotWeb.Live.Chat.UploadHelpers do
         {:ok, :spawned}
 
       {:error, _reason} ->
-        send(liveview_pid, {:attachment_saved, {:error, entry.client_name}})
+        send(liveview_pid, {:attachment_saved, {:error, entry.client_name}, entry.ref})
         {:ok, :error}
     end
   end
