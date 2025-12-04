@@ -102,7 +102,8 @@ const Hooks = {
         e.preventDefault()
         const form = this.el.closest("form")
         if (form && this.el.value.trim()) {
-          form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))
+          // Use requestSubmit() to properly trigger LiveView's phx-submit
+          form.requestSubmit()
         }
       }
       // Shift+Enter adds a newline (default behavior, no need to handle)
