@@ -124,6 +124,10 @@ defmodule Chatbot.Ollama do
         Logger.warning("Ollama embed request failed: status=#{status}, body=#{inspect(body)}")
         {:error, "Failed to generate embedding. Please check if Ollama is running."}
 
+      {:error, %Mint.TransportError{reason: :timeout}} ->
+        Logger.warning("Ollama embed request timed out")
+        {:error, "Embedding request timed out. Please try again."}
+
       {:error, exception} ->
         Logger.warning("Ollama embed request error: #{Exception.message(exception)}")
         {:error, "Failed to connect to Ollama. Please check if it is running."}
@@ -151,6 +155,10 @@ defmodule Chatbot.Ollama do
       {:ok, %{status: status, body: body}} ->
         Logger.warning("Ollama batch embed failed: status=#{status}, body=#{inspect(body)}")
         {:error, "Failed to generate embeddings. Please check if Ollama is running."}
+
+      {:error, %Mint.TransportError{reason: :timeout}} ->
+        Logger.warning("Ollama batch embed request timed out")
+        {:error, "Embedding request timed out. Please try again."}
 
       {:error, exception} ->
         Logger.warning("Ollama batch embed error: #{Exception.message(exception)}")
@@ -216,6 +224,12 @@ defmodule Chatbot.Ollama do
         Logger.warning("Ollama chat completion failed: status=#{status}, body=#{inspect(body)}")
         {:error, "Failed to get AI response. Please try again."}
 
+      {:error, %Mint.TransportError{reason: :timeout}} ->
+        Logger.warning("Ollama chat completion timed out after #{timeout()}ms")
+
+        {:error,
+         "Request timed out. The AI model is taking too long to respond. Please try again or use a smaller model."}
+
       {:error, exception} ->
         Logger.warning("Ollama chat completion error: #{Exception.message(exception)}")
         {:error, "Failed to connect to Ollama. Please check if it is running."}
@@ -250,6 +264,12 @@ defmodule Chatbot.Ollama do
       {:ok, %{status: status, body: body}} ->
         Logger.warning("Ollama chat with tools failed: status=#{status}, body=#{inspect(body)}")
         {:error, "Failed to get AI response. Please try again."}
+
+      {:error, %Mint.TransportError{reason: :timeout}} ->
+        Logger.warning("Ollama chat with tools timed out after #{timeout()}ms")
+
+        {:error,
+         "Request timed out. The AI model is taking too long to respond. Please try again or use a smaller model."}
 
       {:error, exception} ->
         Logger.warning("Ollama chat with tools error: #{Exception.message(exception)}")

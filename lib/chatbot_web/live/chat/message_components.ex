@@ -119,6 +119,8 @@ defmodule ChatbotWeb.Live.Chat.MessageComponents do
   """
   attr :messages, :any, required: true, doc: "Stream of messages from LiveView stream/3"
   attr :is_streaming, :boolean, required: true
+  attr :is_processing, :boolean, default: false
+  attr :processing_status, :string, default: nil
   attr :streaming_chunks, :list, required: true
   attr :last_valid_html, :any, default: nil
 
@@ -140,6 +142,12 @@ defmodule ChatbotWeb.Live.Chat.MessageComponents do
           </div>
         </div>
 
+        <%= if @is_processing do %>
+          <div id="processing-indicator">
+            <.processing_indicator status={@processing_status} />
+          </div>
+        <% end %>
+
         <%= if @is_streaming do %>
           <div id="streaming-response">
             <.streaming_response
@@ -148,6 +156,32 @@ defmodule ChatbotWeb.Live.Chat.MessageComponents do
             />
           </div>
         <% end %>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Renders the processing indicator with status message.
+  """
+  attr :status, :string, default: nil
+
+  @spec processing_indicator(map()) :: Phoenix.LiveView.Rendered.t()
+  def processing_indicator(assigns) do
+    ~H"""
+    <div class="flex gap-4">
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 text-white flex items-center justify-center flex-shrink-0">
+        <.icon name="hero-sparkles" class="w-4 h-4" />
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="inline-block max-w-[85%] rounded-2xl rounded-bl-md px-4 py-3 bg-base-200 border border-base-300 shadow-sm">
+          <div class="flex items-center gap-3">
+            <span class="loading loading-spinner loading-sm text-primary"></span>
+            <span class="text-base-content/70 text-sm">
+              {@status || "Processing your request..."}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
     """

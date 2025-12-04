@@ -40,12 +40,15 @@ defmodule ChatbotWeb.ChatLive.Show do
         |> assign(:streaming_chunks, [])
         |> assign(:last_valid_html, nil)
         |> assign(:is_streaming, false)
+        |> assign(:is_processing, false)
+        |> assign(:processing_status, nil)
         |> assign(:available_models, [])
         |> assign(:selected_model, conversation.model_name)
         |> assign(:models_loading, true)
         |> assign(:show_delete_modal, false)
         |> assign(:streaming_task_pid, nil)
         |> assign(:sidebar_open, false)
+        |> assign(:attachments_expanded, true)
         |> assign(:form, to_form(%{"content" => ""}, as: :message))
         |> UploadHelpers.configure_uploads()
         |> UploadHelpers.load_attachments()
@@ -78,6 +81,11 @@ defmodule ChatbotWeb.ChatLive.Show do
   @impl Phoenix.LiveView
   def handle_info({:error, error_msg}, socket) do
     StreamingHelpers.handle_streaming_error(error_msg, socket)
+  end
+
+  @impl Phoenix.LiveView
+  def handle_info({:process_message, content}, socket) do
+    StreamingHelpers.handle_process_message(content, socket)
   end
 
   @impl Phoenix.LiveView
@@ -132,6 +140,11 @@ defmodule ChatbotWeb.ChatLive.Show do
   @impl Phoenix.LiveView
   def handle_event("toggle_sidebar", _params, socket) do
     {:noreply, assign(socket, :sidebar_open, !socket.assigns.sidebar_open)}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("toggle_attachments", _params, socket) do
+    {:noreply, assign(socket, :attachments_expanded, !socket.assigns.attachments_expanded)}
   end
 
   @impl Phoenix.LiveView
@@ -320,6 +333,8 @@ defmodule ChatbotWeb.ChatLive.Show do
         <.messages_container
           messages={@streams.messages}
           is_streaming={@is_streaming}
+          is_processing={@is_processing}
+          processing_status={@processing_status}
           streaming_chunks={@streaming_chunks}
           last_valid_html={@last_valid_html}
         />
@@ -328,6 +343,7 @@ defmodule ChatbotWeb.ChatLive.Show do
           is_streaming={@is_streaming}
           uploads={@uploads}
           attachments={@attachments}
+          attachments_expanded={@attachments_expanded}
         />
       </main>
       

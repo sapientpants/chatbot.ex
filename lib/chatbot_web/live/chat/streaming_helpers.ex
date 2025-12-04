@@ -123,13 +123,30 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
         :ok ->
           # Auto-upload pending files before processing message
           socket = auto_upload_pending_files(socket)
-          # MessageProcessor handles atomic task registration
-          MessageProcessor.process(content, socket)
+
+          # Show processing indicator immediately and defer actual processing
+          # This ensures the UI updates before the synchronous work begins
+          send(self(), {:process_message, content})
+
+          {:noreply,
+           socket
+           |> assign(:is_processing, true)
+           |> assign(:processing_status, "Preparing your message...")
+           |> assign(:form, to_form(%{"content" => ""}, as: :message))}
 
         {:error, message} ->
           {:noreply, put_flash(socket, :error, message)}
       end
     end
+  end
+
+  @doc """
+  Handles deferred message processing after UI has updated.
+  """
+  @spec handle_process_message(String.t(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_process_message(content, socket) do
+    MessageProcessor.process(content, socket)
   end
 
   @doc """
@@ -206,6 +223,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   defp reset_streaming_state(socket) do
     socket
     |> assign(:is_streaming, false)
+    |> assign(:is_processing, false)
+    |> assign(:processing_status, nil)
     |> assign(:streaming_chunks, [])
     |> assign(:last_valid_html, nil)
   end

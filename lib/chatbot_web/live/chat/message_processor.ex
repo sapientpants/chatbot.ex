@@ -30,16 +30,24 @@ defmodule ChatbotWeb.Live.Chat.MessageProcessor do
     conversation_id = socket.assigns.current_conversation.id
     user_id = socket.assigns.current_user.id
 
+    # Update processing status
+    socket = assign(socket, :processing_status, "Saving your message...")
+
     case Chat.create_message(%{conversation_id: conversation_id, role: "user", content: content}) do
       {:ok, user_message} ->
         socket = maybe_update_title(socket, content)
         model = socket.assigns.selected_model || "default"
 
+        # Update status for context building (includes RAG retrieval)
+        socket = assign(socket, :processing_status, "Retrieving relevant context...")
+
         {:ok, openai_messages, rag_sources} =
           ContextBuilder.build_context(conversation_id, user_id, current_query: content)
 
+        # Update status for generating response
         socket =
           socket
+          |> assign(:processing_status, "Generating response...")
           |> maybe_update_model(model)
           |> assign(:rag_sources, rag_sources)
 
@@ -50,7 +58,11 @@ defmodule ChatbotWeb.Live.Chat.MessageProcessor do
         end
 
       {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to save message")}
+        {:noreply,
+         socket
+         |> assign(:is_processing, false)
+         |> assign(:processing_status, nil)
+         |> put_flash(:error, "Failed to save message")}
     end
   end
 
@@ -87,6 +99,8 @@ defmodule ChatbotWeb.Live.Chat.MessageProcessor do
       |> assign(:streaming_chunks, [])
       |> assign(:streaming_task_pid, task_pid)
       |> assign(:is_streaming, true)
+      |> assign(:is_processing, false)
+      |> assign(:processing_status, nil)
       |> assign(:last_user_message, user_message.content)
       |> assign(:form, to_form(%{"content" => ""}, as: :message))
     end
@@ -117,6 +131,8 @@ defmodule ChatbotWeb.Live.Chat.MessageProcessor do
       |> assign(:has_messages, true)
       |> assign(:streaming_task_pid, task_pid)
       |> assign(:is_streaming, true)
+      |> assign(:is_processing, false)
+      |> assign(:processing_status, nil)
       |> assign(:agent_mode, true)
       |> assign(:pending_tool_calls, [])
       |> assign(:tool_results, [])
@@ -143,14 +159,18 @@ defmodule ChatbotWeb.Live.Chat.MessageProcessor do
             {:noreply,
              socket
              |> stream_insert(:messages, user_message, at: -1)
+             |> assign(:is_processing, false)
+             |> assign(:processing_status, nil)
              |> put_flash(:error, "Failed to start AI response. Please try again.")
              |> assign(:form, to_form(%{"content" => ""}, as: :message))}
         end
 
       {:error, :limit_exceeded} ->
         {:noreply,
-         put_flash(
-           socket,
+         socket
+         |> assign(:is_processing, false)
+         |> assign(:processing_status, nil)
+         |> put_flash(
            :error,
            "Too many active requests. Please wait for current responses to complete."
          )}
@@ -167,6 +187,8 @@ defmodule ChatbotWeb.Live.Chat.MessageProcessor do
   defp reset_streaming_state(socket) do
     socket
     |> assign(:is_streaming, false)
+    |> assign(:is_processing, false)
+    |> assign(:processing_status, nil)
     |> assign(:streaming_chunks, [])
     |> assign(:last_valid_html, nil)
   end
