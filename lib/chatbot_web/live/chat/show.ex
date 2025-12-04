@@ -48,7 +48,7 @@ defmodule ChatbotWeb.ChatLive.Show do
         |> assign(:show_delete_modal, false)
         |> assign(:streaming_task_pid, nil)
         |> assign(:sidebar_open, false)
-        |> assign(:attachments_expanded, true)
+        |> assign(:attachments_expanded, false)
         |> assign(:form, to_form(%{"content" => ""}, as: :message))
         |> UploadHelpers.configure_uploads()
         |> UploadHelpers.load_attachments()
