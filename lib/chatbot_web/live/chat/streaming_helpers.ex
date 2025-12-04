@@ -35,6 +35,7 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   @doc """
   Handles loading available models from LM Studio.
   Uses the ModelCache to avoid repeated API calls.
+  Falls back to saved preference or first available model.
   """
   @spec handle_load_models(Phoenix.LiveView.Socket.t()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
@@ -45,7 +46,17 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
 
         socket =
           if is_nil(socket.assigns.selected_model) and model_list != [] do
-            assign(socket, :selected_model, List.first(model_list))
+            # Try to use saved preference, fall back to first available
+            preferred = Chatbot.Settings.get("preferred_chat_model")
+
+            model =
+              if preferred && preferred in model_list do
+                preferred
+              else
+                List.first(model_list)
+              end
+
+            assign(socket, :selected_model, model)
           else
             socket
           end
@@ -121,10 +132,16 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
 
       case RateLimiter.check_message_rate_limit(user_id) do
         :ok ->
-          # Auto-upload pending files before processing message
-          socket = auto_upload_pending_files(socket)
-          # MessageProcessor handles atomic task registration
-          MessageProcessor.process(content, socket)
+          # Show processing indicator immediately and defer actual processing
+          # This ensures the UI updates before the synchronous work begins
+          # Note: Attachments are now auto-uploaded when selected, not when message is sent
+          send(self(), {:process_message, content})
+
+          {:noreply,
+           socket
+           |> assign(:is_processing, true)
+           |> assign(:processing_status, "Preparing your message...")
+           |> assign(:form, to_form(%{"content" => ""}, as: :message))}
 
         {:error, message} ->
           {:noreply, put_flash(socket, :error, message)}
@@ -133,11 +150,29 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   end
 
   @doc """
+  Handles deferred message processing after UI has updated.
+  """
+  @spec handle_process_message(String.t(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_process_message(content, socket) do
+    MessageProcessor.process(content, socket)
+  end
+
+  @doc """
   Handles model selection change.
+  Persists the model preference to settings for future sessions.
   """
   @spec handle_select_model(String.t(), Phoenix.LiveView.Socket.t()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_select_model(model_id, socket) do
+    # Persist preference for future sessions
+    Chatbot.Settings.set("preferred_chat_model", model_id)
+
+    # Update conversation if one exists
+    if conversation = socket.assigns[:current_conversation] do
+      Chat.update_conversation(conversation, %{model_name: model_id})
+    end
+
     {:noreply, assign(socket, :selected_model, model_id)}
   end
 
@@ -186,6 +221,26 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   end
 
   @doc """
+  Handles stopping/cancelling the current streaming response.
+  """
+  @spec handle_stop_streaming(Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_stop_streaming(socket) do
+    task_pid = socket.assigns[:streaming_task_pid]
+
+    if task_pid && Process.alive?(task_pid) do
+      Process.exit(task_pid, :kill)
+    end
+
+    maybe_unregister_streaming_task(socket)
+
+    {:noreply,
+     socket
+     |> assign(:streaming_task_pid, nil)
+     |> reset_streaming_state()}
+  end
+
+  @doc """
   Handles task crash/completion monitoring.
   """
   @spec handle_task_down(atom() | term(), Phoenix.LiveView.Socket.t()) ::
@@ -206,6 +261,8 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
   defp reset_streaming_state(socket) do
     socket
     |> assign(:is_streaming, false)
+    |> assign(:is_processing, false)
+    |> assign(:processing_status, nil)
     |> assign(:streaming_chunks, [])
     |> assign(:last_valid_html, nil)
   end
@@ -226,23 +283,5 @@ defmodule ChatbotWeb.Live.Chat.StreamingHelpers do
     user_id = socket.assigns.current_user.id
     task_pid = socket.assigns[:streaming_task_pid]
     if task_pid, do: unregister_task(user_id, task_pid)
-  end
-
-  defp auto_upload_pending_files(socket) do
-    uploads = socket.assigns[:uploads]
-    entries = uploads && uploads[:markdown_files] && uploads.markdown_files.entries
-
-    if entries && entries != [] do
-      case UploadHelpers.handle_upload(socket) do
-        {:ok, updated_socket} ->
-          updated_socket
-
-        {:error, updated_socket, error_msg} ->
-          Logger.warning("Auto-upload failed: #{error_msg}")
-          put_flash(updated_socket, :error, error_msg)
-      end
-    else
-      socket
-    end
   end
 end

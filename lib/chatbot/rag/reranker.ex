@@ -14,6 +14,7 @@ defmodule Chatbot.RAG.Reranker do
   """
 
   alias Chatbot.Chat.AttachmentChunk
+  alias Chatbot.ModelCache
   alias Chatbot.ProviderRouter
 
   require Logger
@@ -243,7 +244,18 @@ defmodule Chatbot.RAG.Reranker do
   end
 
   defp default_model do
-    Chatbot.Settings.get("default_model") || "ollama/llama3"
+    case Chatbot.Settings.get("default_model") do
+      nil -> first_available_model()
+      model -> model
+    end
+  end
+
+  defp first_available_model do
+    case ModelCache.get_models() do
+      {:ok, [first | _rest]} -> first["id"]
+      {:ok, []} -> nil
+      {:error, _reason} -> nil
+    end
   end
 
   defp config(key, default) do

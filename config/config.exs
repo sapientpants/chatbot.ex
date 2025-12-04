@@ -32,7 +32,7 @@ config :chatbot, :ollama,
   base_url: "http://localhost:11434",
   embedding_model: "qwen3-embedding:0.6b",
   embedding_dimension: 1024,
-  timeout_ms: 30_000,
+  timeout_ms: 300_000,
   stream_timeout_ms: 300_000
 
 # MCP (Model Context Protocol) configuration

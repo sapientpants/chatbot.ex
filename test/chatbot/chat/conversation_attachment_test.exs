@@ -30,12 +30,14 @@ defmodule Chatbot.Chat.ConversationAttachmentTest do
 
     test "rejects files exceeding max size" do
       conversation = conversation_fixture()
+      # 101 MB exceeds the 100 MB limit
+      over_limit = 101 * 1024 * 1024
 
       attrs = %{
         conversation_id: conversation.id,
         filename: "large.md",
-        content: String.duplicate("x", 200_000),
-        size_bytes: 200_000
+        content: "# Large file",
+        size_bytes: over_limit
       }
 
       changeset = ConversationAttachment.changeset(%ConversationAttachment{}, attrs)
@@ -117,12 +119,12 @@ defmodule Chatbot.Chat.ConversationAttachmentTest do
   end
 
   describe "constants" do
-    test "max_file_size returns 100KB" do
-      assert ConversationAttachment.max_file_size() == 100 * 1024
+    test "max_file_size returns 100MB" do
+      assert ConversationAttachment.max_file_size() == 100 * 1024 * 1024
     end
 
-    test "max_attachments_per_conversation returns 5" do
-      assert ConversationAttachment.max_attachments_per_conversation() == 5
+    test "max_attachments_per_conversation returns 1000" do
+      assert ConversationAttachment.max_attachments_per_conversation() == 1000
     end
 
     test "allowed_extensions returns expected list" do

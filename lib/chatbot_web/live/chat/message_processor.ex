@@ -32,7 +32,16 @@ defmodule ChatbotWeb.Live.Chat.MessageProcessor do
 
     case Chat.create_message(%{conversation_id: conversation_id, role: "user", content: content}) do
       {:ok, user_message} ->
-        socket = maybe_update_title(socket, content)
+        # Immediately show user message and bouncing dots
+        socket =
+          socket
+          |> maybe_update_title(content)
+          |> stream_insert(:messages, user_message, at: -1)
+          |> assign(:has_messages, true)
+          |> assign(:is_streaming, true)
+          |> assign(:is_processing, false)
+          |> assign(:form, to_form(%{"content" => ""}, as: :message))
+
         model = socket.assigns.selected_model || "default"
 
         {:ok, openai_messages, rag_sources} =
@@ -50,7 +59,11 @@ defmodule ChatbotWeb.Live.Chat.MessageProcessor do
         end
 
       {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to save message")}
+        {:noreply,
+         socket
+         |> assign(:is_processing, false)
+         |> assign(:processing_status, nil)
+         |> put_flash(:error, "Failed to save message")}
     end
   end
 
@@ -82,13 +95,9 @@ defmodule ChatbotWeb.Live.Chat.MessageProcessor do
 
     socket_updater = fn socket, task_pid ->
       socket
-      |> stream_insert(:messages, user_message, at: -1)
-      |> assign(:has_messages, true)
       |> assign(:streaming_chunks, [])
       |> assign(:streaming_task_pid, task_pid)
-      |> assign(:is_streaming, true)
       |> assign(:last_user_message, user_message.content)
-      |> assign(:form, to_form(%{"content" => ""}, as: :message))
     end
 
     start_supervised_task(socket, user_message, user_id, liveview_pid, task_fn, socket_updater)
@@ -113,15 +122,11 @@ defmodule ChatbotWeb.Live.Chat.MessageProcessor do
 
     socket_updater = fn socket, task_pid ->
       socket
-      |> stream_insert(:messages, user_message, at: -1)
-      |> assign(:has_messages, true)
       |> assign(:streaming_task_pid, task_pid)
-      |> assign(:is_streaming, true)
       |> assign(:agent_mode, true)
       |> assign(:pending_tool_calls, [])
       |> assign(:tool_results, [])
       |> assign(:last_user_message, user_message.content)
-      |> assign(:form, to_form(%{"content" => ""}, as: :message))
     end
 
     start_supervised_task(socket, user_message, user_id, liveview_pid, task_fn, socket_updater)
@@ -143,14 +148,18 @@ defmodule ChatbotWeb.Live.Chat.MessageProcessor do
             {:noreply,
              socket
              |> stream_insert(:messages, user_message, at: -1)
+             |> assign(:is_processing, false)
+             |> assign(:processing_status, nil)
              |> put_flash(:error, "Failed to start AI response. Please try again.")
              |> assign(:form, to_form(%{"content" => ""}, as: :message))}
         end
 
       {:error, :limit_exceeded} ->
         {:noreply,
-         put_flash(
-           socket,
+         socket
+         |> assign(:is_processing, false)
+         |> assign(:processing_status, nil)
+         |> put_flash(
            :error,
            "Too many active requests. Please wait for current responses to complete."
          )}
@@ -167,6 +176,8 @@ defmodule ChatbotWeb.Live.Chat.MessageProcessor do
   defp reset_streaming_state(socket) do
     socket
     |> assign(:is_streaming, false)
+    |> assign(:is_processing, false)
+    |> assign(:processing_status, nil)
     |> assign(:streaming_chunks, [])
     |> assign(:last_valid_html, nil)
   end

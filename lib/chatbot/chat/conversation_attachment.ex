@@ -9,8 +9,10 @@ defmodule Chatbot.Chat.ConversationAttachment do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @max_file_size 100 * 1024
-  @max_attachments_per_conversation 5
+  # 100 MB - RAG handles chunking for large documents
+  @max_file_size 100 * 1024 * 1024
+  # High limit (1000) - sufficient for most use cases with RAG chunking
+  @max_attachments_per_conversation 1000
   @allowed_extensions ~w(.md .markdown .txt)
 
   @type t :: %__MODULE__{
@@ -90,11 +92,11 @@ defmodule Chatbot.Chat.ConversationAttachment do
     end
   end
 
-  @doc "Returns the maximum file size in bytes (100KB)."
+  @doc "Returns the maximum file size in bytes (100MB)."
   @spec max_file_size() :: pos_integer()
   def max_file_size, do: @max_file_size
 
-  @doc "Returns the maximum number of attachments per conversation (5)."
+  @doc "Returns the maximum number of attachments per conversation (1000 - effectively unlimited)."
   @spec max_attachments_per_conversation() :: pos_integer()
   def max_attachments_per_conversation, do: @max_attachments_per_conversation
 
