@@ -42,6 +42,8 @@ defmodule ChatbotWeb.Live.Chat.UploadHelpers do
         socket = save_completed_upload_async(socket, entry, conversation.id)
         {:noreply, socket}
       else
+        # No conversation - consume and discard the upload
+        consume_uploaded_entry(socket, entry, fn _meta -> {:ok, :discarded} end)
         {:noreply, socket}
       end
     else
@@ -95,9 +97,17 @@ defmodule ChatbotWeb.Live.Chat.UploadHelpers do
     }
 
     ref = entry.ref
+    filename = entry.client_name
 
     Task.Supervisor.start_child(Chatbot.TaskSupervisor, fn ->
-      result = save_attachment_to_db(attrs, entry.client_name)
+      result =
+        try do
+          save_attachment_to_db(attrs, filename)
+        rescue
+          _exception ->
+            {:error, filename}
+        end
+
       send(liveview_pid, {:attachment_saved, result, ref})
     end)
   end
