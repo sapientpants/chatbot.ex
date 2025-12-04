@@ -11,6 +11,7 @@ defmodule Chatbot.Settings do
   |-----|---------|-------------|
   | `completion_provider` | `"ollama"` | Which provider handles chat completions |
   | `embedding_provider` | `"ollama"` | Which provider handles embeddings |
+  | `default_model` | `nil` | Default model for RAG operations (reranking, query expansion) |
   | `ollama_url` | `"http://localhost:11434"` | Ollama server URL |
   | `ollama_embedding_model` | `"qwen3-embedding:0.6b"` | Default embedding model |
   | `lmstudio_enabled` | `"false"` | Whether LM Studio is enabled |
@@ -43,6 +44,7 @@ defmodule Chatbot.Settings do
   @defaults %{
     "completion_provider" => "ollama",
     "embedding_provider" => "ollama",
+    "default_model" => nil,
     "ollama_url" => "http://localhost:11434",
     "ollama_embedding_model" => "qwen3-embedding:0.6b",
     "lmstudio_enabled" => "false",
