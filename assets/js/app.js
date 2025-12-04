@@ -142,13 +142,13 @@ const Hooks = {
         modal.id = "citation-modal"
         modal.className = "modal"
         modal.innerHTML = `
-          <div class="modal-box max-w-2xl">
+          <div class="modal-box max-w-2xl max-h-[calc(100vh-4rem)] flex flex-col">
             <form method="dialog">
               <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
             </form>
-            <h3 class="font-bold text-lg mb-2" id="citation-modal-title">Source</h3>
-            <div class="text-sm text-base-content/60 mb-3" id="citation-modal-meta"></div>
-            <div class="prose prose-sm max-w-full" id="citation-modal-content"></div>
+            <h3 class="font-bold text-lg mb-2 flex-shrink-0" id="citation-modal-title">Source</h3>
+            <div class="text-sm text-base-content/60 mb-3 flex-shrink-0" id="citation-modal-meta"></div>
+            <div class="prose prose-sm max-w-full overflow-y-auto flex-1" id="citation-modal-content"></div>
           </div>
           <form method="dialog" class="modal-backdrop">
             <button>close</button>
