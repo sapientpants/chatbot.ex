@@ -117,7 +117,9 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
       if assigns.uploads, do: length(assigns.uploads.markdown_files.entries), else: 0
 
     total_count = attachment_count + pending_count
-    should_collapse = total_count > @collapse_threshold
+    has_pending = pending_count > 0
+    # Don't collapse while uploads are in progress to avoid flickering
+    should_collapse = total_count > @collapse_threshold and not has_pending
 
     total_size = Enum.sum(Enum.map(assigns.attachments, & &1.size_bytes))
 
@@ -126,6 +128,7 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
       |> assign(:total_count, total_count)
       |> assign(:should_collapse, should_collapse)
       |> assign(:total_size, total_size)
+      |> assign(:has_pending, has_pending)
 
     ~H"""
     <%= if @total_count > 0 do %>

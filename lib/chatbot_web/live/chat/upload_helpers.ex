@@ -18,8 +18,77 @@ defmodule ChatbotWeb.Live.Chat.UploadHelpers do
       accept: ~w(.md .markdown .txt),
       max_entries: ConversationAttachment.max_attachments_per_conversation(),
       max_file_size: ConversationAttachment.max_file_size(),
-      auto_upload: false
+      auto_upload: true,
+      progress: &handle_progress/3
     )
+  end
+
+  @doc """
+  Handles upload progress. When an entry completes (100%), saves it to the database.
+  """
+  @spec handle_progress(
+          :markdown_files,
+          Phoenix.LiveView.UploadEntry.t(),
+          Phoenix.LiveView.Socket.t()
+        ) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_progress(:markdown_files, entry, socket) do
+    if entry.done? do
+      # Upload complete, save to database
+      conversation = socket.assigns[:current_conversation]
+
+      if conversation && conversation.id do
+        socket = save_completed_upload(socket, entry, conversation.id)
+        {:noreply, socket}
+      else
+        {:noreply, socket}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
+  # sobelow_skip ["Traversal.FileModule"]
+  # Path is provided by Phoenix's upload handling - safe temporary file path
+  defp save_completed_upload(socket, entry, conversation_id) do
+    result =
+      consume_uploaded_entry(socket, entry, fn %{path: path} ->
+        case File.read(path) do
+          {:ok, content} ->
+            attrs = %{
+              conversation_id: conversation_id,
+              filename: entry.client_name,
+              content: content,
+              content_type: entry.client_type || "text/markdown",
+              size_bytes: entry.client_size
+            }
+
+            case Chat.create_attachment(attrs) do
+              {:ok, attachment} ->
+                {:ok, {:ok, attachment}}
+
+              {:error, _changeset} ->
+                {:ok, {:error, entry.client_name}}
+            end
+
+          {:error, _reason} ->
+            {:ok, {:error, entry.client_name}}
+        end
+      end)
+
+    handle_save_result(result, socket, entry.client_name)
+  end
+
+  defp handle_save_result({:ok, attachment}, socket, _filename) do
+    # Append to maintain chronological order (newest last)
+    # Performance is acceptable for max 1000 attachments added one at a time
+    # credo:disable-for-next-line Credo.Check.Refactor.AppendSingleItem
+    updated_attachments = socket.assigns.attachments ++ [attachment]
+    assign(socket, :attachments, updated_attachments)
+  end
+
+  defp handle_save_result({:error, _filename}, socket, filename) do
+    put_flash(socket, :error, "Failed to save #{filename}")
   end
 
   @doc """
@@ -37,86 +106,6 @@ defmodule ChatbotWeb.Live.Chat.UploadHelpers do
       end
 
     assign(socket, :attachments, attachments)
-  end
-
-  @doc """
-  Handles the upload event, consuming entries and saving to database.
-  """
-  @spec handle_upload(Phoenix.LiveView.Socket.t()) ::
-          {:ok, Phoenix.LiveView.Socket.t()}
-          | {:error, Phoenix.LiveView.Socket.t(), String.t()}
-  def handle_upload(socket) do
-    conversation = socket.assigns[:current_conversation]
-
-    if conversation && conversation.id do
-      do_handle_upload(socket, conversation.id)
-    else
-      {:error, socket, "No conversation selected"}
-    end
-  end
-
-  defp do_handle_upload(socket, conversation_id) do
-    current_count = Chat.attachment_count(conversation_id)
-    pending_count = length(socket.assigns.uploads.markdown_files.entries)
-    max_count = ConversationAttachment.max_attachments_per_conversation()
-
-    if current_count + pending_count > max_count do
-      {:error, socket, "Maximum #{max_count} attachments per conversation"}
-    else
-      results =
-        consume_uploaded_entries(socket, :markdown_files, fn %{path: path}, entry ->
-          process_upload_entry(path, entry, conversation_id)
-        end)
-
-      build_upload_result(socket, results)
-    end
-  end
-
-  # sobelow_skip ["Traversal.FileModule"]
-  # Path is provided by Phoenix's upload handling - safe temporary file path
-  defp process_upload_entry(path, entry, conversation_id) do
-    case File.read(path) do
-      {:ok, content} ->
-        save_attachment(content, entry, conversation_id)
-
-      {:error, _reason} ->
-        {:ok, {:error, entry.client_name}}
-    end
-  end
-
-  defp save_attachment(content, entry, conversation_id) do
-    attrs = %{
-      conversation_id: conversation_id,
-      filename: entry.client_name,
-      content: content,
-      content_type: entry.client_type || "text/markdown",
-      size_bytes: entry.client_size
-    }
-
-    case Chat.create_attachment(attrs) do
-      {:ok, attachment} -> {:ok, {:ok, attachment}}
-      {:error, _changeset} -> {:ok, {:error, entry.client_name}}
-    end
-  end
-
-  defp build_upload_result(socket, results) do
-    {successes, failures} =
-      Enum.split_with(results, fn
-        {:ok, _attachment} -> true
-        {:error, _name} -> false
-      end)
-
-    uploaded_attachments = Enum.map(successes, fn {:ok, attachment} -> attachment end)
-
-    updated_socket =
-      assign(socket, :attachments, socket.assigns.attachments ++ uploaded_attachments)
-
-    if failures == [] do
-      {:ok, updated_socket}
-    else
-      failed_names = Enum.map_join(failures, ", ", fn {:error, name} -> name end)
-      {:error, updated_socket, "Failed to upload: #{failed_names}"}
-    end
   end
 
   @doc """
