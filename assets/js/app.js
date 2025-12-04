@@ -110,6 +110,7 @@ const Hooks = {
   },
 
   // Citation highlighter - makes superscript footnote references clickable
+  // and generates a reliable References section from stored rag_sources
   CitationHighlighter: {
     // Superscript character mappings
     SUPERSCRIPTS: {
@@ -118,19 +119,24 @@ const Hooks = {
       "¹⁶": 16, "¹⁷": 17, "¹⁸": 18, "¹⁹": 19, "²⁰": 20
     },
 
+    SUPERSCRIPT_PATTERN: /¹⁰|¹¹|¹²|¹³|¹⁴|¹⁵|¹⁶|¹⁷|¹⁸|¹⁹|²⁰|[¹²³⁴⁵⁶⁷⁸⁹]/g,
+
     mounted() {
       this.sources = JSON.parse(this.el.dataset.ragSources || "[]")
-      this.highlightCitations()
       this.setupModal()
+      if (this.sources.length > 0) {
+        this.processCitations()
+      }
     },
 
     updated() {
       this.sources = JSON.parse(this.el.dataset.ragSources || "[]")
-      this.highlightCitations()
+      if (this.sources.length > 0) {
+        this.processCitations()
+      }
     },
 
     setupModal() {
-      // Create modal if it doesn't exist
       if (!document.getElementById("citation-modal")) {
         const modal = document.createElement("dialog")
         modal.id = "citation-modal"
@@ -152,7 +158,6 @@ const Hooks = {
       }
     },
 
-    // Convert number to superscript string
     toSuperscript(num) {
       const superscripts = {
         1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶", 7: "⁷", 8: "⁸", 9: "⁹",
@@ -162,28 +167,63 @@ const Hooks = {
       return superscripts[num] || `[${num}]`
     },
 
-    highlightCitations() {
-      if (this.sources.length === 0) return
+    processCitations() {
+      // Step 1: Remove any LLM-generated References section
+      this.removeReferencesSection()
 
-      // Create a regex that matches all superscript patterns (two-digit first, then single)
-      const superscriptPattern = /¹⁰|¹¹|¹²|¹³|¹⁴|¹⁵|¹⁶|¹⁷|¹⁸|¹⁹|²⁰|[¹²³⁴⁵⁶⁷⁸⁹]/g
+      // Step 2: Collect citations in order of appearance
+      const citationOrder = this.collectCitationsInOrder()
+      if (citationOrder.length === 0) return
 
-      // Find the References section header if it exists
-      const referencesHeader = this.findReferencesHeader()
+      // Step 3: Build renumber map and ordered sources list
+      const { renumberMap, usedSources } = this.buildRenumberMap(citationOrder)
 
-      // First pass: collect all citations in order of appearance to build renumbering map
-      // Only process citations BEFORE the References section
-      const walker1 = document.createTreeWalker(this.el, NodeFilter.SHOW_TEXT, null, false)
-      const citationOrder = [] // Original indices in order of first appearance
-      let node1
-      while ((node1 = walker1.nextNode())) {
-        // Stop when we reach the References section
-        if (referencesHeader && this.isInOrAfterReferences(node1, referencesHeader)) {
-          break
+      // Step 4: Replace inline citations with clickable, renumbered versions
+      this.replaceInlineCitations(renumberMap, usedSources)
+
+      // Step 5: Append frontend-generated References section
+      this.appendReferencesSection(usedSources)
+    },
+
+    removeReferencesSection() {
+      // Find and remove any h2/h3/strong with "References" text and all content after it
+      const headings = this.el.querySelectorAll("h2, h3, strong")
+      for (const heading of headings) {
+        if (heading.textContent.trim().toLowerCase() === "references") {
+          // Remove this heading and all following siblings
+          let node = heading.parentElement || heading
+          const parent = node.parentElement
+
+          if (parent) {
+            // Collect nodes to remove (heading and everything after)
+            const nodesToRemove = []
+            let foundHeading = false
+
+            for (const child of parent.children) {
+              if (child === node || child.contains(heading)) {
+                foundHeading = true
+              }
+              if (foundHeading) {
+                nodesToRemove.push(child)
+              }
+            }
+
+            nodesToRemove.forEach(n => n.remove())
+          }
+          return
         }
-        superscriptPattern.lastIndex = 0
+      }
+    },
+
+    collectCitationsInOrder() {
+      const citationOrder = [] // Original indices in order of first appearance
+      const walker = document.createTreeWalker(this.el, NodeFilter.SHOW_TEXT, null, false)
+      let node
+
+      while ((node = walker.nextNode())) {
+        this.SUPERSCRIPT_PATTERN.lastIndex = 0
         let match
-        while ((match = superscriptPattern.exec(node1.textContent)) !== null) {
+        while ((match = this.SUPERSCRIPT_PATTERN.exec(node.textContent)) !== null) {
           const originalIndex = this.SUPERSCRIPTS[match[0]]
           if (originalIndex && !citationOrder.includes(originalIndex)) {
             citationOrder.push(originalIndex)
@@ -191,78 +231,84 @@ const Hooks = {
         }
       }
 
-      // Build mapping: original index -> new sequential index (starting from 1)
-      const renumberMap = {}
-      citationOrder.forEach((originalIndex, i) => {
-        renumberMap[originalIndex] = i + 1
-      })
+      return citationOrder
+    },
 
-      // Build renumbered sources for the modal
-      this.renumberedSources = {}
+    buildRenumberMap(citationOrder) {
+      const renumberMap = {}
+      const usedSources = []
+
       citationOrder.forEach((originalIndex, i) => {
+        const newIndex = i + 1
+        renumberMap[originalIndex] = newIndex
+
+        // Find the source with this original index
         const source = this.sources.find(s => (s.index || s["index"]) === originalIndex)
         if (source) {
-          this.renumberedSources[i + 1] = {
+          usedSources.push({
             ...source,
-            displayIndex: i + 1
-          }
+            displayIndex: newIndex,
+            filename: source.filename || source["filename"],
+            section: source.section || source["section"],
+            content: source.content || source["content"]
+          })
         }
       })
 
-      // Reorder and renumber the References section if it exists
-      if (referencesHeader) {
-        this.reorderReferencesSection(referencesHeader, renumberMap)
-      }
+      this.usedSources = usedSources
+      return { renumberMap, usedSources }
+    },
 
-      // Second pass: replace citations with renumbered clickable links (outside References)
-      const walker2 = document.createTreeWalker(this.el, NodeFilter.SHOW_TEXT, null, false)
+    replaceInlineCitations(renumberMap, usedSources) {
+      // Collect text nodes that contain superscripts
       const nodesToProcess = []
-      let node2
-      while ((node2 = walker2.nextNode())) {
-        // Skip nodes in/after the References section (already handled)
-        if (referencesHeader && this.isInOrAfterReferences(node2, referencesHeader)) {
-          continue
+      const walker = document.createTreeWalker(this.el, NodeFilter.SHOW_TEXT, null, false)
+      let node
+
+      while ((node = walker.nextNode())) {
+        this.SUPERSCRIPT_PATTERN.lastIndex = 0
+        if (this.SUPERSCRIPT_PATTERN.test(node.textContent)) {
+          nodesToProcess.push(node)
         }
-        superscriptPattern.lastIndex = 0
-        if (superscriptPattern.test(node2.textContent)) {
-          nodesToProcess.push(node2)
-        }
-        superscriptPattern.lastIndex = 0
       }
 
+      // Process each text node
       nodesToProcess.forEach(textNode => {
         const text = textNode.textContent
         const fragment = document.createDocumentFragment()
         let lastIndex = 0
-        let match
 
-        superscriptPattern.lastIndex = 0
-        while ((match = superscriptPattern.exec(text)) !== null) {
+        this.SUPERSCRIPT_PATTERN.lastIndex = 0
+        let match
+        while ((match = this.SUPERSCRIPT_PATTERN.exec(text)) !== null) {
           const originalIndex = this.SUPERSCRIPTS[match[0]]
           const newIndex = renumberMap[originalIndex]
-          const source = this.renumberedSources[newIndex]
 
           // Add text before the match
           if (match.index > lastIndex) {
             fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)))
           }
 
-          if (source) {
+          if (newIndex) {
+            // Find the source for this index
+            const source = usedSources.find(s => s.displayIndex === newIndex)
+
             // Create clickable span with renumbered citation
             const span = document.createElement("span")
             span.textContent = this.toSuperscript(newIndex)
             span.className = "citation-link cursor-pointer text-primary hover:underline font-semibold"
             span.dataset.sourceIndex = newIndex
-            const filename = source.filename || source["filename"]
-            span.title = `Click to view source: ${filename}`
-            span.addEventListener("click", (e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              this.showSource(source, newIndex)
-            })
+            if (source) {
+              span.title = `Click to view source: ${source.filename}`
+              span.addEventListener("click", (e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                this.showSource(source)
+              })
+            }
             fragment.appendChild(span)
           } else {
-            // No source found, just add the original text
+            // No mapping found, keep original
             fragment.appendChild(document.createTextNode(match[0]))
           }
 
@@ -275,163 +321,74 @@ const Hooks = {
         }
 
         // Replace the text node
-        textNode.parentNode.replaceChild(fragment, textNode)
-      })
-    },
-
-    // Find the References heading element
-    findReferencesHeader() {
-      // Look for h2 with "References" text
-      const headings = this.el.querySelectorAll("h2, h3, strong")
-      for (const heading of headings) {
-        if (heading.textContent.trim().toLowerCase() === "references") {
-          return heading
-        }
-      }
-      return null
-    },
-
-    // Check if a node is in or after the References section
-    isInOrAfterReferences(node, referencesHeader) {
-      // Compare document position
-      const position = referencesHeader.compareDocumentPosition(node)
-      // Node is after or contained by referencesHeader's parent
-      return (position & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 ||
-             (position & Node.DOCUMENT_POSITION_CONTAINED_BY) !== 0
-    },
-
-    // Reorder and renumber the References section
-    reorderReferencesSection(referencesHeader, renumberMap) {
-      const superscriptPattern = /¹⁰|¹¹|¹²|¹³|¹⁴|¹⁵|¹⁶|¹⁷|¹⁸|¹⁹|²⁰|[¹²³⁴⁵⁶⁷⁸⁹]/g
-
-      // Find the container for reference items (usually following siblings or parent's children)
-      const container = referencesHeader.parentElement
-      if (!container) return
-
-      // Collect reference lines: look for elements that start with a superscript
-      const referenceItems = []
-      let sibling = referencesHeader.nextElementSibling || referencesHeader.parentElement.nextElementSibling
-
-      // Also check if references are in a list or paragraphs after the heading
-      const possibleContainers = container.parentElement ?
-        Array.from(container.parentElement.children).filter(el => {
-          const position = referencesHeader.compareDocumentPosition(el)
-          return (position & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
-        }) : []
-
-      // Try to find reference items in various formats
-      for (const el of [sibling, ...possibleContainers]) {
-        if (!el) continue
-
-        // Check if this element contains a superscript at the start
-        const text = el.textContent
-        superscriptPattern.lastIndex = 0
-        const match = superscriptPattern.exec(text)
-
-        if (match && match.index < 3) { // Superscript near the start
-          const originalIndex = this.SUPERSCRIPTS[match[0]]
-          const newIndex = renumberMap[originalIndex]
-          if (newIndex) {
-            referenceItems.push({
-              element: el,
-              originalIndex,
-              newIndex,
-              html: el.innerHTML
-            })
-          }
-        }
-      }
-
-      // Sort by new index and renumber
-      referenceItems.sort((a, b) => a.newIndex - b.newIndex)
-
-      // Update each reference item with the correct number
-      referenceItems.forEach(item => {
-        const newSuperscript = this.toSuperscript(item.newIndex)
-        const source = this.renumberedSources[item.newIndex]
-
-        // Replace the old superscript with the new one and make it clickable
-        const walker = document.createTreeWalker(item.element, NodeFilter.SHOW_TEXT, null, false)
-        let textNode
-        let processed = false
-
-        while ((textNode = walker.nextNode()) && !processed) {
-          superscriptPattern.lastIndex = 0
-          const match = superscriptPattern.exec(textNode.textContent)
-
-          if (match) {
-            const text = textNode.textContent
-            const fragment = document.createDocumentFragment()
-
-            // Text before superscript
-            if (match.index > 0) {
-              fragment.appendChild(document.createTextNode(text.slice(0, match.index)))
-            }
-
-            // Create clickable superscript
-            if (source) {
-              const span = document.createElement("span")
-              span.textContent = newSuperscript
-              span.className = "citation-link cursor-pointer text-primary hover:underline font-semibold"
-              span.dataset.sourceIndex = item.newIndex
-              const filename = source.filename || source["filename"]
-              span.title = `Click to view source: ${filename}`
-              span.addEventListener("click", (e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                this.showSource(source, item.newIndex)
-              })
-              fragment.appendChild(span)
-            } else {
-              fragment.appendChild(document.createTextNode(newSuperscript))
-            }
-
-            // Text after superscript
-            fragment.appendChild(document.createTextNode(text.slice(match.index + match[0].length)))
-
-            textNode.parentNode.replaceChild(fragment, textNode)
-            processed = true
-          }
+        if (textNode.parentNode) {
+          textNode.parentNode.replaceChild(fragment, textNode)
         }
       })
-
-      // Reorder DOM elements if needed
-      if (referenceItems.length > 1) {
-        const parent = referenceItems[0].element.parentElement
-        if (parent) {
-          // Sort elements by their new index
-          referenceItems.forEach(item => {
-            parent.appendChild(item.element)
-          })
-        }
-      }
     },
 
-    showSource(source, displayIndex) {
+    appendReferencesSection(usedSources) {
+      if (usedSources.length === 0) return
+
+      // Create the references section container
+      const refsSection = document.createElement("div")
+      refsSection.className = "references-section mt-6 pt-4 border-t border-base-300"
+
+      // Add heading
+      const heading = document.createElement("h2")
+      heading.className = "text-base font-semibold mb-3"
+      heading.textContent = "References"
+      refsSection.appendChild(heading)
+
+      // Add each reference (already in correct order from usedSources)
+      usedSources.forEach(source => {
+        const refItem = document.createElement("p")
+        refItem.className = "reference-item text-sm my-1 flex items-start gap-1"
+
+        // Clickable superscript
+        const sup = document.createElement("span")
+        sup.textContent = this.toSuperscript(source.displayIndex)
+        sup.className = "citation-link cursor-pointer text-primary hover:underline font-semibold"
+        sup.title = `Click to view source: ${source.filename}`
+        sup.addEventListener("click", (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          this.showSource(source)
+        })
+
+        // Reference text
+        const refText = document.createElement("span")
+        const sectionInfo = source.section ? ` - ${source.section}` : ""
+        refText.textContent = ` ${source.filename}${sectionInfo}`
+        refText.className = "text-base-content/80"
+
+        refItem.appendChild(sup)
+        refItem.appendChild(refText)
+        refsSection.appendChild(refItem)
+      })
+
+      // Append to the message container
+      this.el.appendChild(refsSection)
+    },
+
+    showSource(source) {
       const modal = document.getElementById("citation-modal")
       const title = document.getElementById("citation-modal-title")
       const meta = document.getElementById("citation-modal-meta")
       const content = document.getElementById("citation-modal-content")
 
-      // Use display index for the title (renumbered)
-      const idx = displayIndex || source.displayIndex || source.index || source["index"]
-      const filename = source.filename || source["filename"]
-      const section = source.section || source["section"]
-      const sourceContent = source.content || source["content"]
-
-      title.textContent = `Source ${idx}: ${filename}`
-      meta.textContent = section ? `Section: ${section}` : ""
+      title.textContent = `Source ${source.displayIndex}: ${source.filename}`
+      meta.textContent = source.section ? `Section: ${source.section}` : ""
 
       // Render content as plain text with line breaks
-      content.innerHTML = this.escapeHtml(sourceContent)
-        .replace(/\n/g, "<br>")
+      content.innerHTML = this.escapeHtml(source.content).replace(/\n/g, "<br>")
 
       modal.showModal()
     },
 
     escapeHtml(text) {
       const div = document.createElement("div")
-      div.textContent = text
+      div.textContent = text || ""
       return div.innerHTML
     }
   },

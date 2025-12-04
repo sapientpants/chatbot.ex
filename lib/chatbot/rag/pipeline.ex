@@ -225,14 +225,10 @@ defmodule Chatbot.RAG.Pipeline do
 
     ---
 
-    IMPORTANT Citation Rules:
-    1. Each excerpt above has a UNIQUE number (¹, ², ³, etc.)
-    2. Use the EXACT number shown for each excerpt when citing it
-    3. Different excerpts MUST use different numbers - never cite two different excerpts with the same number
-    4. At the end of your response, include a "References" section listing each cited source ONCE:
-       ## References
-       ¹ filename.md - Section Name
-       ² other-file.md - Section Name
+    Citation Instructions:
+    - Use the superscript numbers (¹, ², ³, etc.) shown above to cite sources inline
+    - Place citations immediately after the relevant information
+    - Do NOT include a References section - it will be auto-generated
     """
 
     header_footer_chars = String.length(header) + String.length(footer)
