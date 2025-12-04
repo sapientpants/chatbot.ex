@@ -203,7 +203,6 @@ defmodule ChatbotWeb.ChatLive.Index do
             messages={@streams.messages}
             is_streaming={@is_streaming}
             is_processing={@is_processing}
-            processing_status={@processing_status}
             streaming_chunks={@streaming_chunks}
             last_valid_html={@last_valid_html}
           />
