@@ -224,8 +224,8 @@ defmodule Chatbot.RAG.Reranker do
     if current_length >= target_length do
       Enum.take(scores, target_length)
     else
-      # Pad with average or 5.0
-      avg = if scores == [], do: 5.0, else: Enum.sum(scores) / current_length
+      # Pad with average or 5.0 (guard against division by zero)
+      avg = if current_length > 0, do: Enum.sum(scores) / current_length, else: 5.0
       scores ++ List.duplicate(avg, target_length - current_length)
     end
   end

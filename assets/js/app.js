@@ -121,8 +121,17 @@ const Hooks = {
 
     SUPERSCRIPT_PATTERN: /¹⁰|¹¹|¹²|¹³|¹⁴|¹⁵|¹⁶|¹⁷|¹⁸|¹⁹|²⁰|[¹²³⁴⁵⁶⁷⁸⁹]/g,
 
+    parseRagSources() {
+      try {
+        return JSON.parse(this.el.dataset.ragSources || "[]")
+      } catch (e) {
+        console.error("Failed to parse RAG sources:", e)
+        return []
+      }
+    },
+
     mounted() {
-      this.sources = JSON.parse(this.el.dataset.ragSources || "[]")
+      this.sources = this.parseRagSources()
       this.setupModal()
       if (this.sources.length > 0) {
         this.processCitations()
@@ -130,7 +139,7 @@ const Hooks = {
     },
 
     updated() {
-      this.sources = JSON.parse(this.el.dataset.ragSources || "[]")
+      this.sources = this.parseRagSources()
       if (this.sources.length > 0) {
         this.processCitations()
       }
