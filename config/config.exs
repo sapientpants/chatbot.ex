@@ -53,6 +53,27 @@ config :chatbot, :memory,
   fact_extraction_enabled: true,
   summarization_threshold: 30
 
+# RAG (Retrieval-Augmented Generation) configuration
+config :chatbot, :rag,
+  enabled: true,
+  # Chunking
+  chunk_size: 2000,
+  chunk_overlap: 200,
+  min_chunk_size: 400,
+  max_chunks_per_attachment: 100,
+  # Query expansion
+  query_expansion_enabled: true,
+  max_expanded_queries: 3,
+  # Reranking (LLM-based, enabled by default)
+  reranking_enabled: true,
+  rerank_top_k: 20,
+  rerank_return_k: 5,
+  # Search
+  retrieval_limit: 10,
+  token_budget: 2000,
+  semantic_weight: 0.6,
+  keyword_weight: 0.4
+
 # UI configuration
 config :chatbot, :ui,
   max_model_name_length: 20,

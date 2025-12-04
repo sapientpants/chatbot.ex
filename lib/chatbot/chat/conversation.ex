@@ -13,6 +13,7 @@ defmodule Chatbot.Chat.Conversation do
           user_id: binary() | nil,
           messages: [Chatbot.Chat.Message.t()] | Ecto.Association.NotLoaded.t(),
           attachments: [Chatbot.Chat.ConversationAttachment.t()] | Ecto.Association.NotLoaded.t(),
+          chunks: [Chatbot.Chat.AttachmentChunk.t()] | Ecto.Association.NotLoaded.t(),
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
         }
@@ -28,6 +29,7 @@ defmodule Chatbot.Chat.Conversation do
     belongs_to :user, Chatbot.Accounts.User, define_field: false
     has_many :messages, Chatbot.Chat.Message
     has_many :attachments, Chatbot.Chat.ConversationAttachment
+    has_many :chunks, Chatbot.Chat.AttachmentChunk
 
     timestamps(type: :utc_datetime)
   end

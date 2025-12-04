@@ -17,14 +17,9 @@ defmodule Chatbot.Memory.Search do
   import Ecto.Query
   import Pgvector.Ecto.Query
 
-  alias Chatbot.Memory.EmbeddingCache
   alias Chatbot.Memory.UserMemory
-  alias Chatbot.ProviderRouter
   alias Chatbot.Repo
-
-  # Reciprocal Rank Fusion (RRF) constant. Higher values reduce the impact of
-  # rank differences. 60 is the standard value from the original RRF paper.
-  @rrf_k 60
+  alias Chatbot.Search.SearchUtils
 
   @doc """
   Searches user memories using hybrid retrieval (semantic + keyword).
@@ -49,13 +44,14 @@ defmodule Chatbot.Memory.Search do
     semantic_weight = Keyword.get(opts, :semantic_weight, config(:semantic_weight, 0.6))
     keyword_weight = Keyword.get(opts, :keyword_weight, config(:keyword_weight, 0.4))
 
-    with {:ok, query_embedding} <- get_query_embedding(query_text) do
+    with {:ok, query_embedding} <- SearchUtils.get_query_embedding(query_text) do
       # Run both searches
       semantic_results = semantic_search(user_id, query_embedding, opts)
       keyword_results = keyword_search(user_id, query_text, opts)
 
       # Combine with RRF
-      fused_ids = rrf_fusion(semantic_results, keyword_results, semantic_weight, keyword_weight)
+      fused_ids =
+        SearchUtils.rrf_fusion(semantic_results, keyword_results, semantic_weight, keyword_weight)
 
       # Fetch full records in fused order, limited
       memories = fetch_in_order(fused_ids, limit)
@@ -120,7 +116,7 @@ defmodule Chatbot.Memory.Search do
     min_confidence = Keyword.get(opts, :min_confidence, 0.0)
     category = Keyword.get(opts, :category)
 
-    tsquery = build_tsquery(query_text)
+    tsquery = SearchUtils.build_tsquery(query_text)
 
     # Return empty if no valid search terms
     if tsquery == "" do
@@ -150,61 +146,14 @@ defmodule Chatbot.Memory.Search do
   @doc """
   Combines search results using Reciprocal Rank Fusion.
 
-  ## Parameters
-
-    * `semantic_results` - Results from semantic search with :id and :rank
-    * `keyword_results` - Results from keyword search with :id and :rank
-    * `semantic_weight` - Weight for semantic results (0.0 to 1.0)
-    * `keyword_weight` - Weight for keyword results (0.0 to 1.0)
-
-  ## Returns
-
-  List of IDs sorted by combined RRF score (highest first).
+  See `Chatbot.Search.SearchUtils.rrf_fusion/4` for details.
   """
   @spec rrf_fusion([map()], [map()], float(), float()) :: [binary()]
   def rrf_fusion(semantic_results, keyword_results, semantic_weight \\ 0.6, keyword_weight \\ 0.4) do
-    # Build score map
-    semantic_scores =
-      Enum.reduce(semantic_results, %{}, fn %{id: id, rank: rank}, acc ->
-        score = semantic_weight / (@rrf_k + rank)
-        Map.update(acc, id, score, &(&1 + score))
-      end)
-
-    combined_scores =
-      Enum.reduce(keyword_results, semantic_scores, fn %{id: id, rank: rank}, acc ->
-        score = keyword_weight / (@rrf_k + rank)
-        Map.update(acc, id, score, &(&1 + score))
-      end)
-
-    # Sort by score descending and return IDs
-    combined_scores
-    |> Enum.sort_by(fn {_id, score} -> score end, :desc)
-    |> Enum.map(fn {id, _score} -> id end)
+    SearchUtils.rrf_fusion(semantic_results, keyword_results, semantic_weight, keyword_weight)
   end
 
   # Private functions
-
-  defp get_query_embedding(text) do
-    result =
-      EmbeddingCache.get_or_compute(text, fn t ->
-        ProviderRouter.embed(t)
-      end)
-
-    case result do
-      {:ok, embedding} -> {:ok, Pgvector.new(embedding)}
-      error -> error
-    end
-  end
-
-  defp build_tsquery(text) do
-    text
-    |> String.downcase()
-    |> String.split(~r/\s+/)
-    |> Enum.take(10)
-    |> Enum.map(&String.replace(&1, ~r/[^\w]/, ""))
-    |> Enum.reject(&(&1 == ""))
-    |> Enum.join(" & ")
-  end
 
   defp fetch_in_order([], _limit), do: []
 

@@ -9,6 +9,9 @@ defmodule Chatbot.Chat do
   alias Chatbot.Chat.Conversation
   alias Chatbot.Chat.ConversationAttachment
   alias Chatbot.Chat.Message
+  alias Chatbot.RAG.ChunkProcessor
+
+  require Logger
 
   @doc """
   Returns the list of conversations for a user.
@@ -360,8 +363,26 @@ defmodule Chatbot.Chat do
       if current_count >= max_count do
         {:error, :attachment_limit_exceeded}
       else
-        do_create_attachment(attrs)
+        do_create_attachment_with_chunks(attrs)
       end
+    else
+      do_create_attachment_with_chunks(attrs)
+    end
+  end
+
+  defp do_create_attachment_with_chunks(attrs) do
+    # Skip transaction overhead when RAG is disabled
+    if rag_enabled?() do
+      Repo.transaction(fn ->
+        with {:ok, attachment} <- do_create_attachment(attrs),
+             {:ok, _chunks} <- process_attachment_chunks(attachment) do
+          attachment
+        else
+          {:error, reason} ->
+            Logger.error("Failed to create attachment with chunks: #{inspect(reason)}")
+            Repo.rollback(reason)
+        end
+      end)
     else
       do_create_attachment(attrs)
     end
@@ -371,6 +392,19 @@ defmodule Chatbot.Chat do
     %ConversationAttachment{}
     |> ConversationAttachment.changeset(attrs)
     |> Repo.insert()
+  end
+
+  defp process_attachment_chunks(attachment) do
+    if rag_enabled?() do
+      ChunkProcessor.process_attachment(attachment)
+    else
+      {:ok, []}
+    end
+  end
+
+  defp rag_enabled? do
+    rag_config = Application.get_env(:chatbot, :rag, [])
+    Keyword.get(rag_config, :enabled, true)
   end
 
   @doc """

@@ -133,12 +133,6 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
               errors={upload_errors(@uploads.markdown_files, entry)}
             />
           <% end %>
-
-          <%= if length(@uploads.markdown_files.entries) > 0 do %>
-            <button type="button" phx-click="upload_files" class="btn btn-xs btn-primary">
-              Upload Files
-            </button>
-          <% end %>
         <% end %>
       </div>
     <% end %>

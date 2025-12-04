@@ -140,14 +140,6 @@ defmodule ChatbotWeb.ChatLive.Show do
   end
 
   @impl Phoenix.LiveView
-  def handle_event("upload_files", _params, socket) do
-    case UploadHelpers.handle_upload(socket) do
-      {:ok, socket} -> {:noreply, socket}
-      {:error, socket, message} -> {:noreply, put_flash(socket, :error, message)}
-    end
-  end
-
-  @impl Phoenix.LiveView
   def handle_event("cancel_upload", %{"ref" => ref}, socket) do
     {:noreply, UploadHelpers.cancel_upload_entry(socket, ref)}
   end

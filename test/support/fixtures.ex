@@ -78,6 +78,10 @@ defmodule Chatbot.Fixtures do
 
   @doc """
   Generate an attachment.
+
+  Note: When RAG is enabled (default), this will also create chunks for the
+  attachment. Use `attachment_fixture_without_chunks/1` to create an attachment
+  without triggering chunk processing.
   """
   def attachment_fixture(attrs \\ %{}) do
     conversation = attrs[:conversation] || conversation_fixture()
@@ -94,5 +98,51 @@ defmodule Chatbot.Fixtures do
       |> Chat.create_attachment()
 
     attachment
+  end
+
+  @doc """
+  Generate an attachment without chunk processing.
+  Bypasses the RAG chunk processing for tests that don't need it.
+  """
+  def attachment_fixture_without_chunks(attrs \\ %{}) do
+    conversation = attrs[:conversation] || conversation_fixture()
+    default_content = "# Test Attachment\n\nThis is test content."
+
+    attrs =
+      Enum.into(attrs, %{
+        conversation_id: conversation.id,
+        filename: "test_#{System.unique_integer([:positive])}.md",
+        content: default_content,
+        size_bytes: byte_size(default_content)
+      })
+
+    %Chat.ConversationAttachment{}
+    |> Chat.ConversationAttachment.changeset(attrs)
+    |> Repo.insert!()
+  end
+
+  @doc """
+  Generate an attachment chunk.
+  """
+  def attachment_chunk_fixture(attrs \\ %{}) do
+    attachment = attrs[:attachment] || attachment_fixture_without_chunks()
+    conversation_id = attachment.conversation_id
+    embedding = attrs[:embedding] || List.duplicate(0.1, 1024)
+
+    default_content = "This is a test chunk content for testing."
+
+    attrs =
+      Enum.into(attrs, %{
+        attachment_id: attachment.id,
+        conversation_id: conversation_id,
+        content: default_content,
+        chunk_index: 0,
+        embedding: embedding,
+        metadata: %{headers: ["Test Section"], section_path: "Test Section"}
+      })
+
+    %Chat.AttachmentChunk{}
+    |> Chat.AttachmentChunk.changeset(attrs)
+    |> Repo.insert!()
   end
 end
