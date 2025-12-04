@@ -188,10 +188,7 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
           </button>
         </div>
       <% end %>
-      <div class={[
-        @compact && "grid grid-cols-2 md:grid-cols-3 gap-2",
-        !@compact && "flex flex-wrap gap-2"
-      ]}>
+      <div class="flex flex-wrap gap-1.5">
         <%= for attachment <- @attachments do %>
           <.attachment_chip
             id={attachment.id}
@@ -230,35 +227,38 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
 
   defp attachment_chip(assigns) do
     size_display = format_file_size(assigns.size)
-    assigns = assign(assigns, :size_display, size_display)
+
+    # For pending uploads, use gradient background to show progress
+    bg_style =
+      if assigns.type == :pending and assigns.progress < 100 do
+        "background: linear-gradient(to right, oklch(var(--p) / 0.3) #{assigns.progress}%, oklch(var(--p) / 0.1) #{assigns.progress}%)"
+      else
+        nil
+      end
+
+    assigns =
+      assigns
+      |> assign(:size_display, size_display)
+      |> assign(:bg_style, bg_style)
 
     ~H"""
-    <div class={[
-      "flex items-center gap-2 rounded-lg text-sm",
-      @compact && "px-2 py-1",
-      !@compact && "px-3 py-1.5",
-      @type == :saved && "bg-base-300",
-      @type == :pending && "bg-primary/10 border border-primary/20"
-    ]}>
-      <.icon name="hero-document-text" class="w-4 h-4 text-primary flex-shrink-0" />
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2">
-          <span class="truncate" title={@filename}>{@filename}</span>
-          <%= if not @compact do %>
-            <span class="text-xs text-base-content/50 flex-shrink-0">({@size_display})</span>
-          <% end %>
-        </div>
-        <%= if @type == :pending and @progress < 100 do %>
-          <progress
-            class="progress progress-primary w-full h-1 mt-1"
-            value={@progress}
-            max="100"
-          />
-        <% end %>
-      </div>
+    <div
+      class={[
+        "flex items-center gap-1.5 rounded-md text-xs px-2 py-1",
+        @type == :saved && "bg-base-300",
+        @type == :pending && @progress >= 100 && "bg-primary/20",
+        @type == :pending && @progress < 100 && "border border-primary/30"
+      ]}
+      style={@bg_style}
+    >
+      <.icon name="hero-document-text" class="w-3 h-3 text-primary flex-shrink-0" />
+      <span class="truncate max-w-[150px]" title={@filename}>{@filename}</span>
+      <%= if not @compact do %>
+        <span class="text-base-content/50 flex-shrink-0">({@size_display})</span>
+      <% end %>
 
       <%= for error <- @errors do %>
-        <span class="text-xs text-error flex-shrink-0">{error_to_string(error)}</span>
+        <span class="text-error flex-shrink-0">{error_to_string(error)}</span>
       <% end %>
 
       <button
@@ -266,7 +266,7 @@ defmodule ChatbotWeb.Live.Chat.InputComponents do
         phx-click={if @type == :saved, do: "remove_attachment", else: "cancel_upload"}
         phx-value-id={if @type == :saved, do: @id, else: nil}
         phx-value-ref={if @type == :pending, do: @id, else: nil}
-        class="btn btn-circle btn-ghost btn-xs flex-shrink-0"
+        class="btn btn-circle btn-ghost btn-xs flex-shrink-0 -mr-1"
         aria-label="Remove attachment"
       >
         <.icon name="hero-x-mark" class="w-3 h-3" />
