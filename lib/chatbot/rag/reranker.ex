@@ -253,7 +253,8 @@ defmodule Chatbot.RAG.Reranker do
   defp first_available_model do
     case ModelCache.get_models() do
       {:ok, [first | _rest]} -> first["id"]
-      _error -> nil
+      {:ok, []} -> nil
+      {:error, _reason} -> nil
     end
   end
 

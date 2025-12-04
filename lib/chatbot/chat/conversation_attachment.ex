@@ -11,7 +11,7 @@ defmodule Chatbot.Chat.ConversationAttachment do
 
   # 100 MB - RAG handles chunking for large documents
   @max_file_size 100 * 1024 * 1024
-  # Effectively unlimited - RAG handles any number of documents
+  # High limit (1000) - sufficient for most use cases with RAG chunking
   @max_attachments_per_conversation 1000
   @allowed_extensions ~w(.md .markdown .txt)
 
